@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'resource/theme/theme.dart';
@@ -31,10 +32,21 @@ class MyApp extends StatelessWidget {
     final themeController = context.watch<ThemeController>();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Admin Panel',
+      title: 'SGI API Console',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeController.themeMode,
+      locale: const Locale('es', 'EC'),
+      supportedLocales: const [
+        Locale('es', 'EC'),
+        Locale('es'),
+        Locale('en'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: const MainScreen(),
     );
   }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../resource/theme/dimens.dart';
+import '../../../states/auth_provider.dart';
 import '../../../states/menu_app_controller.dart';
 import '../../../states/theme_controller.dart';
 import '../../../utils/responsive.dart';
@@ -12,27 +14,103 @@ class Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Responsive.isMobile(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: context.read<MenuAppController>().controlMenu,
+              ),
+              Expanded(child: _HeaderGreeting()),
+              const ThemeToggleButton(),
+              const SizedBox(width: defaultPadding / 2),
+              const ProfileCard(),
+            ],
+          ),
+          const SizedBox(height: defaultPadding),
+          const SearchField(),
+        ],
+      );
+    }
+
     return Row(
       children: [
         if (!Responsive.isDesktop(context))
           IconButton(
-            icon: Icon(Icons.menu),
+            icon: const Icon(Icons.menu),
             onPressed: context.read<MenuAppController>().controlMenu,
           ),
-        if (!Responsive.isMobile(context))
-          Text(
-            "Dashboard",
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-        if (!Responsive.isMobile(context))
-          Spacer(flex: Responsive.isDesktop(context) ? 2 : 1),
-        const Expanded(child: SearchField()),
-        SizedBox(width: defaultPadding),
+        const Expanded(
+          flex: 2,
+          child: _HeaderGreeting(),
+        ),
+        const SizedBox(width: defaultPadding),
+        const Expanded(
+          flex: 3,
+          child: SearchField(),
+        ),
+        const SizedBox(width: defaultPadding),
         const ThemeToggleButton(),
-        SizedBox(width: defaultPadding),
+        const SizedBox(width: defaultPadding),
         const ProfileCard(),
       ],
     );
+  }
+}
+
+class _HeaderGreeting extends StatelessWidget {
+  const _HeaderGreeting();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final authProvider = context.watch<AuthProvider>();
+    final name = _resolveName(authProvider.email);
+    final dateLabel = DateFormat('EEEE, d MMMM y', 'es_EC')
+        .format(DateTime.now())
+        .replaceFirstMapped(
+          RegExp(r'^.'),
+          (match) => match.group(0)!.toUpperCase(),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Buen dia, $name',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          dateLabel,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withAlpha(160),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _resolveName(String? email) {
+    if (email == null || email.trim().isEmpty) {
+      return 'Usuario';
+    }
+    final parts = email.split('@');
+    if (parts.isEmpty || parts.first.trim().isEmpty) {
+      return 'Usuario';
+    }
+    final raw = parts.first.replaceAll(RegExp(r'[^a-zA-Z0-9]'), ' ');
+    final words = raw.split(' ').where((w) => w.isNotEmpty).toList();
+    if (words.isEmpty) {
+      return 'Usuario';
+    }
+    return words
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
 }
 
@@ -42,30 +120,71 @@ class ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: defaultPadding,
-        vertical: defaultPadding / 2,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.all(Radius.circular(10)),
-        border: Border.all(color: theme.colorScheme.outline.withAlpha(153)),
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            "assets/images/profile_pic.png",
-            height: 38,
+    final authProvider = context.watch<AuthProvider>();
+    final name = authProvider.email ?? 'Usuario';
+    final subtitle = authProvider.rol == null
+        ? 'Sesion activa'
+        : '${authProvider.rol} • Empresa ${authProvider.empresaId ?? '-'}';
+    return PopupMenuButton<String>(
+      tooltip: 'Sesion',
+      onSelected: (value) {
+        if (value == 'logout') {
+          context.read<AuthProvider>().logout();
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 18),
+              SizedBox(width: 8),
+              Text('Cerrar sesion'),
+            ],
           ),
-          if (!Responsive.isMobile(context))
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: defaultPadding / 2),
-              child: Text("Angelina Jolie"),
+        ),
+      ],
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: defaultPadding,
+          vertical: defaultPadding / 2,
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.all(Radius.circular(10)),
+          border: Border.all(color: theme.colorScheme.outline.withAlpha(153)),
+        ),
+        child: Row(
+          children: [
+            Image.asset(
+              "assets/images/profile_pic.png",
+              height: 38,
             ),
-          Icon(Icons.keyboard_arrow_down, color: theme.colorScheme.onSurface),
-        ],
+            if (!Responsive.isMobile(context))
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: defaultPadding / 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withAlpha(160),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Icon(Icons.keyboard_arrow_down, color: theme.colorScheme.onSurface),
+          ],
+        ),
       ),
     );
   }
@@ -79,7 +198,7 @@ class SearchField extends StatelessWidget {
     final theme = Theme.of(context);
     return TextField(
       decoration: InputDecoration(
-        hintText: "Search",
+        hintText: "Buscar endpoint o modulo",
         fillColor: theme.colorScheme.surface,
         filled: true,
         border: const OutlineInputBorder(

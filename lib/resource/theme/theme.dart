@@ -8,7 +8,7 @@ class AppTheme {
   static final ThemeData dark = _buildDarkTheme();
 
   static ThemeData _buildLightTheme() {
-    final base = ThemeData.light();
+    final base = ThemeData.light(useMaterial3: true);
     final colorScheme = base.colorScheme.copyWith(
       primary: AppColors.primary,
       secondary: AppColors.primary,
@@ -51,7 +51,7 @@ class AppTheme {
   }
 
   static ThemeData _buildDarkTheme() {
-    final base = ThemeData.dark();
+    final base = ThemeData.dark(useMaterial3: true);
     final colorScheme = base.colorScheme.copyWith(
       primary: AppColors.primary,
       secondary: AppColors.primary,
