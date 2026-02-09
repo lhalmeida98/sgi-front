@@ -36,6 +36,7 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _authProvider = AuthProvider(AuthService(ApiClient()));
+    _authProvider.restoreSession();
   }
 
   @override
@@ -50,6 +51,13 @@ class _MainScreenState extends State<MainScreen> {
       value: _authProvider,
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
+          if (authProvider.isRestoring) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
           if (!authProvider.isAuthenticated) {
             return const LoginScreen();
           }
@@ -84,7 +92,9 @@ class _MainShell extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (Responsive.isDesktop(context))
-              Expanded(
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: menuController.isMenuCollapsed ? 86 : 250,
                 child: const SideMenu(),
               ),
             Expanded(

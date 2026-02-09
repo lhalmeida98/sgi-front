@@ -5,9 +5,11 @@ import '../routing/app_sections.dart';
 class MenuAppController extends ChangeNotifier {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   AppSection _activeSection = AppSection.dashboard;
+  bool _isMenuCollapsed = false;
 
   GlobalKey<ScaffoldState> get scaffoldKey => _scaffoldKey;
   AppSection get activeSection => _activeSection;
+  bool get isMenuCollapsed => _isMenuCollapsed;
 
   void setSection(AppSection section) {
     if (_activeSection == section) {
@@ -21,5 +23,10 @@ class MenuAppController extends ChangeNotifier {
     if (!_scaffoldKey.currentState!.isDrawerOpen) {
       _scaffoldKey.currentState!.openDrawer();
     }
+  }
+
+  void toggleMenuCollapsed() {
+    _isMenuCollapsed = !_isMenuCollapsed;
+    notifyListeners();
   }
 }
