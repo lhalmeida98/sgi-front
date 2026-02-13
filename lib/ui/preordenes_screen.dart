@@ -5,13 +5,16 @@ import '../domain/models/cliente.dart';
 import '../domain/models/empresa.dart';
 import '../domain/models/preorden.dart';
 import '../domain/models/producto.dart';
+import '../domain/models/bodega.dart';
 import '../resource/theme/dimens.dart';
 import '../services/api_client.dart';
+import '../services/bodegas_service.dart';
 import '../services/clientes_service.dart';
 import '../services/empresas_service.dart';
 import '../services/preordenes_service.dart';
 import '../services/productos_service.dart';
 import '../states/auth_provider.dart';
+import '../states/bodegas_provider.dart';
 import '../states/clientes_provider.dart';
 import '../states/empresas_provider.dart';
 import '../states/preordenes_provider.dart';
@@ -33,6 +36,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
   late final EmpresasProvider _empresasProvider;
   late final ClientesProvider _clientesProvider;
   late final ProductosProvider _productosProvider;
+  late final BodegasProvider _bodegasProvider;
 
   @override
   void initState() {
@@ -42,11 +46,13 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
     _empresasProvider = EmpresasProvider(EmpresasService(_client));
     _clientesProvider = ClientesProvider(ClientesService(_client));
     _productosProvider = ProductosProvider(ProductosService(_client));
+    _bodegasProvider = BodegasProvider(BodegasService(_client));
 
     _preordenesProvider.fetchPreordenes();
     _empresasProvider.fetchEmpresas();
     _clientesProvider.fetchClientes();
     _productosProvider.fetchProductos();
+    _bodegasProvider.fetchBodegas();
   }
 
   @override
@@ -55,6 +61,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
     _empresasProvider.dispose();
     _clientesProvider.dispose();
     _productosProvider.dispose();
+    _bodegasProvider.dispose();
     super.dispose();
   }
 
@@ -66,11 +73,12 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
         ChangeNotifierProvider.value(value: _empresasProvider),
         ChangeNotifierProvider.value(value: _clientesProvider),
         ChangeNotifierProvider.value(value: _productosProvider),
+        ChangeNotifierProvider.value(value: _bodegasProvider),
       ],
-      child: Consumer4<PreordenesProvider, EmpresasProvider, ClientesProvider,
-          ProductosProvider>(
+      child: Consumer5<PreordenesProvider, EmpresasProvider, ClientesProvider,
+          ProductosProvider, BodegasProvider>(
         builder: (context, preordenesProvider, empresasProvider,
-            clientesProvider, productosProvider, _) {
+            clientesProvider, productosProvider, bodegasProvider, _) {
           final authProvider = context.watch<AuthProvider>();
           final empresaId = authProvider.empresaId;
           final empresas = empresaId == null
@@ -96,6 +104,15 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                         producto.empresaId == empresaId,
                   )
                   .toList();
+          final bodegas = empresaId == null
+              ? bodegasProvider.bodegas
+              : bodegasProvider.bodegas
+                  .where(
+                    (bodega) =>
+                        bodega.empresaId == null ||
+                        bodega.empresaId == empresaId,
+                  )
+                  .toList();
           final preordenes = empresaId == null
               ? preordenesProvider.preordenes
               : preordenesProvider.preordenes
@@ -105,11 +122,13 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
           final isLoading = preordenesProvider.isLoading ||
               empresasProvider.isLoading ||
               clientesProvider.isLoading ||
-              productosProvider.isLoading;
+              productosProvider.isLoading ||
+              bodegasProvider.isLoading;
           final errorMessage = preordenesProvider.errorMessage ??
               empresasProvider.errorMessage ??
               clientesProvider.errorMessage ??
-              productosProvider.errorMessage;
+              productosProvider.errorMessage ??
+              bodegasProvider.errorMessage;
 
           return SafeArea(
             child: SingleChildScrollView(
@@ -134,6 +153,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                             empresas: empresas,
                             clientes: clientes,
                             productos: productos,
+                            bodegas: bodegas,
                             defaultEmpresaId: empresaId,
                             canSelectEmpresa: authProvider.isAdmin,
                           ),
@@ -146,6 +166,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                             empresas: empresas,
                             clientes: clientes,
                             productos: productos,
+                            bodegas: bodegas,
                             defaultEmpresaId: empresaId,
                             canSelectEmpresa: authProvider.isAdmin,
                           ),
@@ -178,6 +199,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                       empresas: empresas,
                       clientes: clientes,
                       productos: productos,
+                      bodegas: bodegas,
                       defaultEmpresaId: empresaId,
                       canSelectEmpresa: authProvider.isAdmin,
                     ),
@@ -197,6 +219,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
     required List<Empresa> empresas,
     required List<Cliente> clientes,
     required List<Producto> productos,
+    required List<Bodega> bodegas,
     int? defaultEmpresaId,
     required bool canSelectEmpresa,
   }) async {
@@ -219,6 +242,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
     final items = preorden?.items
             .map(
               (item) => _PreordenItemDraft(
+                bodegaId: item.bodegaId,
                 productoId: item.productoId,
                 cantidad: item.cantidad,
                 descuento: item.descuento,
@@ -226,6 +250,14 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
             )
             .toList() ??
         [_PreordenItemDraft(cantidad: 1, descuento: 0)];
+    int? bodegaId;
+    if (items.isNotEmpty) {
+      final firstBodegaId = items.first.bodegaId;
+      final allSame = items.every((item) => item.bodegaId == firstBodegaId);
+      if (allSame) {
+        bodegaId = firstBodegaId;
+      }
+    }
 
     await showDialog<void>(
       context: providerContext,
@@ -234,130 +266,189 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
           title: Text(isEditing ? 'Editar preorden' : 'Crear preorden'),
           content: StatefulBuilder(
             builder: (context, setState) {
+              final availableBodegas = empresaId == null
+                  ? bodegas
+                  : bodegas
+                      .where(
+                        (bodega) =>
+                            bodega.empresaId == null ||
+                            bodega.empresaId == empresaId,
+                      )
+                      .toList();
+              if (bodegaId == null && availableBodegas.length == 1) {
+                bodegaId = availableBodegas.first.id;
+                for (final item in items) {
+                  item.bodegaId ??= bodegaId;
+                }
+              }
+              final selectedBodegaId = availableBodegas.any(
+                (bodega) => bodega.id == bodegaId,
+              )
+                  ? bodegaId
+                  : null;
               return SizedBox(
-                width: 680,
+                width: 900,
                 child: SingleChildScrollView(
                   child: Form(
                     key: formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        canSelectEmpresa
-                            ? DropdownButtonFormField<int>(
-                                value: empresaId,
-                                items: empresas
-                                    .map(
-                                      (empresa) => DropdownMenuItem(
-                                        value: empresa.id,
-                                        child: Text(empresa.razonSocial),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (value) {
-                                  setState(() => empresaId = value);
+                        Responsive(
+                          mobile: Column(
+                            children: [
+                              _PreordenDatosCard(
+                                empresas: empresas,
+                                clientes: clientes,
+                                bodegas: availableBodegas,
+                                canSelectEmpresa: canSelectEmpresa,
+                                empresaId: empresaId,
+                                clienteId: clienteId,
+                                bodegaId: selectedBodegaId,
+                                dirEstablecimientoController:
+                                    dirEstablecimientoController,
+                                monedaController: monedaController,
+                                observacionesController:
+                                    observacionesController,
+                                reservaInventario: reservaInventario,
+                                onEmpresaChanged: (value) {
+                                  setState(() {
+                                    empresaId = value;
+                                    bodegaId = null;
+                                    for (final item in items) {
+                                      item.bodegaId = null;
+                                    }
+                                  });
                                 },
-                                decoration: const InputDecoration(
-                                  labelText: 'Empresa',
-                                ),
-                                validator: (value) {
-                                  if (value == null) {
-                                    return 'Seleccione empresa';
-                                  }
-                                  return null;
+                                onClienteChanged: (value) =>
+                                    setState(() => clienteId = value),
+                                onBodegaChanged: (value) {
+                                  setState(() {
+                                    bodegaId = value;
+                                    for (final item in items) {
+                                      item.bodegaId = value;
+                                    }
+                                  });
                                 },
-                              )
-                            : TextFormField(
-                                readOnly: true,
-                                initialValue: empresas
-                                    .firstWhere(
-                                      (empresa) => empresa.id == empresaId,
-                                      orElse: () => empresas.first,
-                                    )
-                                    .razonSocial,
-                                decoration: const InputDecoration(
-                                  labelText: 'Empresa',
-                                ),
+                                onReservaChanged: (value) =>
+                                    setState(() => reservaInventario = value),
                               ),
-                        const SizedBox(height: defaultPadding / 2),
-                        DropdownButtonFormField<int>(
-                          value: clienteId,
-                          items: clientes
-                              .map(
-                                (cliente) => DropdownMenuItem(
-                                  value: cliente.id,
-                                  child: Text(cliente.razonSocial),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            setState(() => clienteId = value);
-                          },
-                          decoration:
-                              const InputDecoration(labelText: 'Cliente'),
-                          validator: (value) {
-                            if (value == null) {
-                              return 'Seleccione cliente';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: defaultPadding / 2),
-                        TextFormField(
-                          controller: dirEstablecimientoController,
-                          decoration: const InputDecoration(
-                            labelText: 'Direccion establecimiento',
+                              const SizedBox(height: defaultPadding),
+                              _TotalPanel(items: items, productos: productos),
+                            ],
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Campo requerido';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: defaultPadding / 2),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: monedaController,
-                                decoration:
-                                    const InputDecoration(labelText: 'Moneda'),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Campo requerido';
-                                  }
-                                  return null;
-                                },
+                          tablet: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: _PreordenDatosCard(
+                                  empresas: empresas,
+                                  clientes: clientes,
+                                  bodegas: availableBodegas,
+                                  canSelectEmpresa: canSelectEmpresa,
+                                  empresaId: empresaId,
+                                  clienteId: clienteId,
+                                  bodegaId: selectedBodegaId,
+                                  dirEstablecimientoController:
+                                      dirEstablecimientoController,
+                                  monedaController: monedaController,
+                                  observacionesController:
+                                      observacionesController,
+                                  reservaInventario: reservaInventario,
+                                  onEmpresaChanged: (value) {
+                                    setState(() {
+                                      empresaId = value;
+                                      bodegaId = null;
+                                      for (final item in items) {
+                                        item.bodegaId = null;
+                                      }
+                                    });
+                                  },
+                                  onClienteChanged: (value) =>
+                                      setState(() => clienteId = value),
+                                  onBodegaChanged: (value) {
+                                    setState(() {
+                                      bodegaId = value;
+                                      for (final item in items) {
+                                        item.bodegaId = value;
+                                      }
+                                    });
+                                  },
+                                  onReservaChanged: (value) =>
+                                      setState(() => reservaInventario = value),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: defaultPadding / 2),
-                            Expanded(
-                              child: SwitchListTile(
-                                value: reservaInventario,
-                                onChanged: (value) {
-                                  setState(() => reservaInventario = value);
-                                },
-                                contentPadding: EdgeInsets.zero,
-                                title: const Text('Reserva inventario'),
+                              const SizedBox(width: defaultPadding),
+                              Expanded(
+                                flex: 2,
+                                child: _TotalPanel(items: items, productos: productos),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: defaultPadding / 2),
-                        TextFormField(
-                          controller: observacionesController,
-                          maxLines: 2,
-                          decoration:
-                              const InputDecoration(labelText: 'Observaciones'),
+                            ],
+                          ),
+                          desktop: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: _PreordenDatosCard(
+                                  empresas: empresas,
+                                  clientes: clientes,
+                                  bodegas: availableBodegas,
+                                  canSelectEmpresa: canSelectEmpresa,
+                                  empresaId: empresaId,
+                                  clienteId: clienteId,
+                                  bodegaId: selectedBodegaId,
+                                  dirEstablecimientoController:
+                                      dirEstablecimientoController,
+                                  monedaController: monedaController,
+                                  observacionesController:
+                                      observacionesController,
+                                  reservaInventario: reservaInventario,
+                                  onEmpresaChanged: (value) {
+                                    setState(() {
+                                      empresaId = value;
+                                      bodegaId = null;
+                                      for (final item in items) {
+                                        item.bodegaId = null;
+                                      }
+                                    });
+                                  },
+                                  onClienteChanged: (value) =>
+                                      setState(() => clienteId = value),
+                                  onBodegaChanged: (value) {
+                                    setState(() {
+                                      bodegaId = value;
+                                      for (final item in items) {
+                                        item.bodegaId = value;
+                                      }
+                                    });
+                                  },
+                                  onReservaChanged: (value) =>
+                                      setState(() => reservaInventario = value),
+                                ),
+                              ),
+                              const SizedBox(width: defaultPadding),
+                              Expanded(
+                                flex: 2,
+                                child: _TotalPanel(items: items, productos: productos),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: defaultPadding),
-                        _ItemsTable(
+                        _PreordenItemsCard(
                           items: items,
                           productos: productos,
+                          bodegas: availableBodegas,
                           onAddItem: () {
                             setState(() {
                               items.add(
-                                _PreordenItemDraft(cantidad: 1, descuento: 0),
+                                _PreordenItemDraft(
+                                  cantidad: 1,
+                                  descuento: 0,
+                                  bodegaId: bodegaId,
+                                ),
                               );
                             });
                           },
@@ -371,8 +462,6 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                           },
                           onChanged: () => setState(() {}),
                         ),
-                        const SizedBox(height: defaultPadding),
-                        _TotalPanel(items: items, productos: productos),
                       ],
                     ),
                   ),
@@ -399,6 +488,14 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                   );
                   return;
                 }
+                if (items.any((item) => item.bodegaId == null)) {
+                  showAppToast(
+                    providerContext,
+                    'Asigna bodega a todos los items.',
+                    isError: true,
+                  );
+                  return;
+                }
                 final provider =
                     providerContext.read<PreordenesProvider>();
                 final payload = Preorden(
@@ -412,6 +509,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                   items: items
                       .map(
                         (item) => PreordenItem(
+                          bodegaId: item.bodegaId,
                           productoId: item.productoId!,
                           cantidad: item.cantidad,
                           descuento: item.descuento,
@@ -454,18 +552,265 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
   }
 }
 
+class _PreordenDatosCard extends StatelessWidget {
+  const _PreordenDatosCard({
+    required this.empresas,
+    required this.clientes,
+    required this.bodegas,
+    required this.canSelectEmpresa,
+    required this.empresaId,
+    required this.clienteId,
+    required this.bodegaId,
+    required this.dirEstablecimientoController,
+    required this.monedaController,
+    required this.observacionesController,
+    required this.reservaInventario,
+    required this.onEmpresaChanged,
+    required this.onClienteChanged,
+    required this.onBodegaChanged,
+    required this.onReservaChanged,
+  });
+
+  final List<Empresa> empresas;
+  final List<Cliente> clientes;
+  final List<Bodega> bodegas;
+  final bool canSelectEmpresa;
+  final int? empresaId;
+  final int? clienteId;
+  final int? bodegaId;
+  final TextEditingController dirEstablecimientoController;
+  final TextEditingController monedaController;
+  final TextEditingController observacionesController;
+  final bool reservaInventario;
+  final ValueChanged<int?> onEmpresaChanged;
+  final ValueChanged<int?> onClienteChanged;
+  final ValueChanged<int?> onBodegaChanged;
+  final ValueChanged<bool> onReservaChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final availableBodegas =
+        bodegas.where((bodega) => bodega.id != null).toList();
+    final selectedBodegaId = availableBodegas.any(
+      (bodega) => bodega.id == bodegaId,
+    )
+        ? bodegaId
+        : null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final cardWidth = maxWidth > 820 ? 820.0 : maxWidth;
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: cardWidth,
+            child: Container(
+              padding: const EdgeInsets.all(defaultPadding),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.all(Radius.circular(12)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Datos de preorden',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: defaultPadding),
+                  canSelectEmpresa
+                      ? DropdownButtonFormField<int>(
+                          value: empresaId,
+                          items: empresas
+                              .map(
+                                (empresa) => DropdownMenuItem(
+                                  value: empresa.id,
+                                  child: Text(empresa.razonSocial),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: onEmpresaChanged,
+                          decoration:
+                              const InputDecoration(labelText: 'Empresa'),
+                        )
+                      : TextFormField(
+                          readOnly: true,
+                          initialValue: empresas
+                              .firstWhere(
+                                (empresa) => empresa.id == empresaId,
+                                orElse: () => empresas.isNotEmpty
+                                    ? empresas.first
+                                    : Empresa(
+                                        id: 0,
+                                        ambiente: '',
+                                        tipoEmision: '',
+                                        razonSocial: '-',
+                                        nombreComercial: '',
+                                        ruc: '',
+                                        dirMatriz: '',
+                                        estab: '',
+                                        ptoEmi: '',
+                                        secuencial: '',
+                                      ),
+                              )
+                              .razonSocial,
+                          decoration:
+                              const InputDecoration(labelText: 'Empresa'),
+                        ),
+                  const SizedBox(height: defaultPadding / 2),
+                  DropdownButtonFormField<int>(
+                    value: clienteId,
+                    items: clientes
+                        .map(
+                          (cliente) => DropdownMenuItem(
+                            value: cliente.id,
+                            child: Text(cliente.razonSocial),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onClienteChanged,
+                    decoration: const InputDecoration(labelText: 'Cliente'),
+                  ),
+                  const SizedBox(height: defaultPadding / 2),
+                  TextFormField(
+                    controller: dirEstablecimientoController,
+                    decoration: const InputDecoration(
+                      labelText: 'Direccion establecimiento',
+                    ),
+                  ),
+                  const SizedBox(height: defaultPadding / 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: monedaController,
+                          decoration: const InputDecoration(labelText: 'Moneda'),
+                        ),
+                      ),
+                      const SizedBox(width: defaultPadding / 2),
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: selectedBodegaId,
+                          items: availableBodegas
+                              .map(
+                                (bodega) => DropdownMenuItem(
+                                  value: bodega.id,
+                                  child: Text(bodega.nombre),
+                                ),
+                              )
+                              .toList(),
+                          onChanged:
+                              availableBodegas.isEmpty ? null : onBodegaChanged,
+                          decoration: const InputDecoration(labelText: 'Bodega'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: defaultPadding / 2),
+                  TextFormField(
+                    controller: observacionesController,
+                    maxLines: 2,
+                    decoration:
+                        const InputDecoration(labelText: 'Observaciones'),
+                  ),
+                  const SizedBox(height: defaultPadding / 2),
+                  SwitchListTile.adaptive(
+                    value: reservaInventario,
+                    onChanged: onReservaChanged,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Reservar inventario'),
+                    subtitle: const Text('Bloquea stock para esta preorden.'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PreordenItemsCard extends StatelessWidget {
+  const _PreordenItemsCard({
+    required this.items,
+    required this.productos,
+    required this.bodegas,
+    required this.onAddItem,
+    required this.onRemoveItem,
+    required this.onChanged,
+  });
+
+  final List<_PreordenItemDraft> items;
+  final List<Producto> productos;
+  final List<Bodega> bodegas;
+  final VoidCallback onAddItem;
+  final void Function(int index) onRemoveItem;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final cardWidth = maxWidth;
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: cardWidth,
+            child: Container(
+              padding: const EdgeInsets.all(defaultPadding),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.all(Radius.circular(12)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Items',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: onAddItem,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Agregar'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: defaultPadding / 2),
+                  _ItemsTable(
+                    items: items,
+                    productos: productos,
+                    bodegas: bodegas,
+                    onRemoveItem: onRemoveItem,
+                    onChanged: onChanged,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ItemsTable extends StatefulWidget {
   const _ItemsTable({
     required this.items,
     required this.productos,
-    required this.onAddItem,
+    required this.bodegas,
     required this.onRemoveItem,
     this.onChanged,
   });
 
   final List<_PreordenItemDraft> items;
   final List<Producto> productos;
-  final VoidCallback onAddItem;
+  final List<Bodega> bodegas;
   final void Function(int index) onRemoveItem;
   final VoidCallback? onChanged;
 
@@ -474,96 +819,192 @@ class _ItemsTable extends StatefulWidget {
 }
 
 class _ItemsTableState extends State<_ItemsTable> {
+  List<Producto> _withSelectedProducto(
+    List<Producto> productos,
+    int? selectedId,
+  ) {
+    if (selectedId == null) {
+      return productos;
+    }
+    final hasSelected = productos.any((producto) => producto.id == selectedId);
+    if (hasSelected) {
+      return productos;
+    }
+    final selected = widget.productos
+        .cast<Producto?>()
+        .firstWhere((producto) => producto?.id == selectedId, orElse: () => null);
+    if (selected == null) {
+      return productos;
+    }
+    return [selected, ...productos];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final availableBodegas =
+        widget.bodegas.where((bodega) => bodega.id != null).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text('Items', style: Theme.of(context).textTheme.titleSmall),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: widget.onAddItem,
-              icon: const Icon(Icons.add),
-              label: const Text('Agregar'),
-            ),
-          ],
-        ),
-        const SizedBox(height: defaultPadding / 2),
-        Column(
-          children: List.generate(widget.items.length, (index) {
-            final item = widget.items[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: defaultPadding / 2),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 4,
-                    child: DropdownButtonFormField<int>(
-                      value: item.productoId,
-                      items: widget.productos
-                          .map(
-                            (producto) => DropdownMenuItem(
-                              value: producto.id,
+      children: List.generate(widget.items.length, (index) {
+        final item = widget.items[index];
+        final dropdownProductos =
+            _withSelectedProducto(widget.productos, item.productoId);
+        final producto = widget.productos.firstWhere(
+          (producto) => producto.id == item.productoId,
+          orElse: () => Producto(
+            id: 0,
+            codigo: '-',
+            descripcion: '-',
+            precioUnitario: 0,
+            categoriaId: 0,
+            impuestoId: 0,
+          ),
+        );
+        final dropdownBodegaId = availableBodegas.any(
+          (bodega) => bodega.id == item.bodegaId,
+        )
+            ? item.bodegaId
+            : null;
+        final totalLinea = (producto.precioUnitario * item.cantidad) -
+            item.descuento;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: defaultPadding / 2),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 320,
+                  child: DropdownButtonFormField<int>(
+                    isExpanded: true,
+                    value: item.productoId,
+                    items: dropdownProductos
+                        .map(
+                          (producto) => DropdownMenuItem(
+                            value: producto.id,
+                            child: SizedBox(
+                              width: 260,
                               child: Text(
                                 '${producto.codigo} - ${producto.descripcion}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          item.productoId = value;
-                        });
-                        widget.onChanged?.call();
-                      },
-                      decoration: const InputDecoration(labelText: 'Producto'),
-                    ),
-                  ),
-                  const SizedBox(width: defaultPadding / 2),
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      initialValue: item.cantidad.toString(),
-                      decoration: const InputDecoration(labelText: 'Cantidad'),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        setState(() {
-                          item.cantidad = int.tryParse(value) ?? 0;
-                        });
-                        widget.onChanged?.call();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: defaultPadding / 2),
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      initialValue: item.descuento.toStringAsFixed(2),
-                      decoration: const InputDecoration(labelText: 'Descuento'),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        setState(() {
-                          item.descuento = double.tryParse(value) ?? 0;
-                        });
-                        widget.onChanged?.call();
-                      },
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      widget.onRemoveItem(index);
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        item.productoId = value;
+                      });
                       widget.onChanged?.call();
                     },
-                    icon: const Icon(Icons.delete_outline),
+                    decoration: _itemDecoration(context, 'Producto'),
                   ),
-                ],
-              ),
-            );
-          }),
-        ),
-      ],
+                ),
+                const SizedBox(width: defaultPadding / 2),
+                SizedBox(
+                  width: 200,
+                  child: DropdownButtonFormField<int>(
+                    value: dropdownBodegaId,
+                    items: availableBodegas
+                        .map(
+                          (bodega) => DropdownMenuItem(
+                            value: bodega.id,
+                            child: Text(bodega.nombre),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        item.bodegaId = value;
+                      });
+                      widget.onChanged?.call();
+                    },
+                    decoration: _itemDecoration(context, 'Bodega'),
+                  ),
+                ),
+                const SizedBox(width: defaultPadding / 2),
+                SizedBox(
+                  width: 110,
+                  child: TextFormField(
+                    initialValue: item.cantidad.toString(),
+                    decoration: _itemDecoration(context, 'Cantidad'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (value) {
+                      setState(() {
+                        item.cantidad = double.tryParse(value) ?? 0;
+                      });
+                      widget.onChanged?.call();
+                    },
+                  ),
+                ),
+                const SizedBox(width: defaultPadding / 2),
+                SizedBox(
+                  width: 130,
+                  child: TextFormField(
+                    initialValue: item.descuento.toStringAsFixed(2),
+                    decoration: _itemDecoration(context, 'Descuento'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (value) {
+                      setState(() {
+                        item.descuento = double.tryParse(value) ?? 0;
+                      });
+                      widget.onChanged?.call();
+                    },
+                  ),
+                ),
+                const SizedBox(width: defaultPadding / 2),
+                SizedBox(
+                  width: 130,
+                  child: InputDecorator(
+                    decoration: _itemDecoration(context, 'Costo'),
+                    child: Text(
+                      producto.precioUnitario.toStringAsFixed(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: defaultPadding / 2),
+                SizedBox(
+                  width: 140,
+                  child: InputDecorator(
+                    decoration: _itemDecoration(context, 'Total'),
+                    child: Text(
+                      totalLinea.toStringAsFixed(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: defaultPadding / 2),
+                IconButton(
+                  onPressed: () {
+                    widget.onRemoveItem(index);
+                    widget.onChanged?.call();
+                  },
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  InputDecoration _itemDecoration(BuildContext context, String label) {
+    final theme = Theme.of(context);
+    return InputDecoration(
+      labelText: label,
+      isDense: true,
+      floatingLabelBehavior: FloatingLabelBehavior.always,
+      labelStyle: theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.onSurface.withAlpha(180),
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 12,
+      ),
     );
   }
 }
@@ -598,13 +1039,16 @@ class _TotalPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(defaultPadding),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withAlpha(204),
-        borderRadius: const BorderRadius.all(Radius.circular(10)),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Totales', style: Theme.of(context).textTheme.titleSmall),
+          Text(
+            'Detalle de preorden',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
           const SizedBox(height: defaultPadding / 2),
           _TotalRow(label: 'Subtotal', value: subtotal),
           _TotalRow(label: 'Descuento', value: descuentoTotal),
@@ -744,10 +1188,12 @@ class _PreordenItemDraft {
   _PreordenItemDraft({
     required this.cantidad,
     required this.descuento,
+    this.bodegaId,
     this.productoId,
   });
 
   int? productoId;
-  int cantidad;
+  int? bodegaId;
+  double cantidad;
   double descuento;
 }

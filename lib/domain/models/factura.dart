@@ -9,6 +9,9 @@ class Factura {
     this.total,
     this.estado,
     this.mensaje,
+    this.sriEstadoConsulta,
+    this.sriEstadoAutorizacion,
+    this.sriMensaje,
     this.claveAcceso,
   });
 
@@ -19,6 +22,9 @@ class Factura {
   final double? total;
   final String? estado;
   final String? mensaje;
+  final String? sriEstadoConsulta;
+  final String? sriEstadoAutorizacion;
+  final String? sriMensaje;
   final String? claveAcceso;
 
   factory Factura.fromJson(Map<String, dynamic> json) {
@@ -34,6 +40,14 @@ class Factura {
       ),
       estado: json['estado']?.toString(),
       mensaje: json['mensaje']?.toString() ?? json['detalle']?.toString(),
+      sriEstadoConsulta:
+          (json['sriEstado']?['estadoConsulta'] ?? json['estadoConsulta'])
+              ?.toString(),
+      sriEstadoAutorizacion:
+          (json['sriEstado']?['estadoAutorizacion'] ?? json['estadoAutorizacion'])
+              ?.toString(),
+      sriMensaje:
+          (json['sriEstado']?['mensaje'] ?? json['mensajeSri'])?.toString(),
       claveAcceso: json['claveAcceso']?.toString(),
     );
   }

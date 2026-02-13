@@ -3,11 +3,14 @@ import 'package:provider/provider.dart';
 
 import '../domain/models/inventario.dart';
 import '../domain/models/producto.dart';
+import '../domain/models/bodega.dart';
 import '../resource/theme/dimens.dart';
 import '../services/api_client.dart';
 import '../services/inventarios_service.dart';
 import '../services/productos_service.dart';
+import '../services/bodegas_service.dart';
 import '../states/auth_provider.dart';
+import '../states/bodegas_provider.dart';
 import '../states/inventarios_provider.dart';
 import '../states/productos_provider.dart';
 import '../ui/shared/feedback.dart';
@@ -25,6 +28,7 @@ class _InventariosScreenState extends State<InventariosScreen> {
   late final ApiClient _client;
   late final InventariosProvider _inventariosProvider;
   late final ProductosProvider _productosProvider;
+  late final BodegasProvider _bodegasProvider;
 
   @override
   void initState() {
@@ -32,14 +36,17 @@ class _InventariosScreenState extends State<InventariosScreen> {
     _client = ApiClient();
     _inventariosProvider = InventariosProvider(InventariosService(_client));
     _productosProvider = ProductosProvider(ProductosService(_client));
+    _bodegasProvider = BodegasProvider(BodegasService(_client));
     _inventariosProvider.fetchInventarios();
     _productosProvider.fetchProductos();
+    _bodegasProvider.fetchBodegas();
   }
 
   @override
   void dispose() {
     _inventariosProvider.dispose();
     _productosProvider.dispose();
+    _bodegasProvider.dispose();
     super.dispose();
   }
 
@@ -49,9 +56,11 @@ class _InventariosScreenState extends State<InventariosScreen> {
       providers: [
         ChangeNotifierProvider.value(value: _inventariosProvider),
         ChangeNotifierProvider.value(value: _productosProvider),
+        ChangeNotifierProvider.value(value: _bodegasProvider),
       ],
-      child: Consumer2<InventariosProvider, ProductosProvider>(
-        builder: (context, inventariosProvider, productosProvider, _) {
+      child: Consumer3<InventariosProvider, ProductosProvider, BodegasProvider>(
+        builder: (context, inventariosProvider, productosProvider,
+            bodegasProvider, _) {
           final authProvider = context.watch<AuthProvider>();
           final empresaId = authProvider.empresaId;
           final inventarios = empresaId == null
@@ -72,9 +81,19 @@ class _InventariosScreenState extends State<InventariosScreen> {
                         producto.empresaId == empresaId,
                   )
                   .toList();
+          final bodegas = empresaId == null
+              ? bodegasProvider.bodegas
+              : bodegasProvider.bodegas
+                  .where(
+                    (bodega) =>
+                        bodega.empresaId == null ||
+                        bodega.empresaId == empresaId,
+                  )
+                  .toList();
           final isMobile = Responsive.isMobile(context);
           final errorMessage = inventariosProvider.errorMessage ??
-              productosProvider.errorMessage;
+              productosProvider.errorMessage ??
+              bodegasProvider.errorMessage;
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(defaultPadding),
@@ -96,6 +115,7 @@ class _InventariosScreenState extends State<InventariosScreen> {
                           onPressed: () => _openInventarioDialog(
                             context,
                             productos: productos,
+                            bodegas: bodegas,
                           ),
                           icon: const Icon(Icons.add),
                         )
@@ -104,6 +124,7 @@ class _InventariosScreenState extends State<InventariosScreen> {
                           onPressed: () => _openInventarioDialog(
                             context,
                             productos: productos,
+                            bodegas: bodegas,
                           ),
                           icon: const Icon(Icons.add),
                           label: const Text('Actualizar stock'),
@@ -111,7 +132,8 @@ class _InventariosScreenState extends State<InventariosScreen> {
                     ],
                   ),
                   if (inventariosProvider.isLoading ||
-                      productosProvider.isLoading)
+                      productosProvider.isLoading ||
+                      bodegasProvider.isLoading)
                     const Padding(
                       padding: EdgeInsets.only(top: defaultPadding / 2),
                       child: LinearProgressIndicator(),
@@ -134,6 +156,7 @@ class _InventariosScreenState extends State<InventariosScreen> {
                       context,
                       inventario: inventario,
                       productos: productos,
+                      bodegas: bodegas,
                     ),
                   ),
                 ],
@@ -149,6 +172,7 @@ class _InventariosScreenState extends State<InventariosScreen> {
     BuildContext providerContext, {
     Inventario? inventario,
     required List<Producto> productos,
+    required List<Bodega> bodegas,
   }) async {
     final isEditing = inventario != null;
     final formKey = GlobalKey<FormState>();
@@ -167,6 +191,38 @@ class _InventariosScreenState extends State<InventariosScreen> {
       text: inventario?.costoPromedio.toStringAsFixed(2) ?? '',
     );
     int? productoId = inventario?.productoId;
+    int? bodegaId = inventario?.bodegaId;
+    var isFetching = false;
+
+    Future<void> fetchDetalle(StateSetter setState) async {
+      if (productoId == null || bodegaId == null) {
+        return;
+      }
+      setState(() => isFetching = true);
+      final detalle =
+          await _inventariosProvider.fetchInventarioDetalle(
+        productoId: productoId!,
+        bodegaId: bodegaId!,
+      );
+      if (detalle != null) {
+        stockActualController.text = detalle.stockActual.toString();
+        stockMinimoController.text = detalle.stockMinimo.toString();
+        stockMaximoController.text = detalle.stockMaximo.toString();
+        ubicacionController.text = detalle.ubicacion;
+        costoPromedioController.text =
+            detalle.costoPromedio.toStringAsFixed(2);
+      } else {
+        showAppToast(
+          providerContext,
+          _inventariosProvider.errorMessage ??
+              'Inventario no encontrado.',
+          isError: true,
+        );
+      }
+      if (providerContext.mounted) {
+        setState(() => isFetching = false);
+      }
+    }
 
     await showDialog<void>(
       context: providerContext,
@@ -176,36 +232,100 @@ class _InventariosScreenState extends State<InventariosScreen> {
           content: StatefulBuilder(
             builder: (context, setState) {
               return SizedBox(
-                width: 480,
+                width: 520,
                 child: Form(
                   key: formKey,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      DropdownButtonFormField<int>(
-                        value: productoId,
-                        items: productos
-                            .map(
-                              (producto) => DropdownMenuItem(
-                                value: producto.id,
-                                child: Text(
-                                  '${producto.codigo} - ${producto.descripcion}',
-                                ),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isCompact = constraints.maxWidth < 520;
+                          final children = <Widget>[
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                value: productoId,
+                                isExpanded: true,
+                                items: productos
+                                    .map(
+                                      (producto) => DropdownMenuItem(
+                                        value: producto.id,
+                                        child: Text(
+                                          '${producto.codigo} - ${producto.descripcion}',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) async {
+                                  setState(() => productoId = value);
+                                  await fetchDetalle(setState);
+                                },
+                                decoration:
+                                    const InputDecoration(labelText: 'Producto'),
+                                validator: (value) {
+                                  if (value == null) {
+                                    return 'Seleccione producto';
+                                  }
+                                  return null;
+                                },
                               ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() => productoId = value);
-                        },
-                        decoration:
-                            const InputDecoration(labelText: 'Producto'),
-                        validator: (value) {
-                          if (value == null) {
-                            return 'Seleccione producto';
+                            ),
+                            SizedBox(
+                              width: isCompact ? 0 : defaultPadding / 2,
+                              height: isCompact ? defaultPadding / 2 : 0,
+                            ),
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                value: bodegaId,
+                                isExpanded: true,
+                                items: bodegas
+                                    .where((bodega) => bodega.id != null)
+                                    .map(
+                                      (bodega) => DropdownMenuItem(
+                                        value: bodega.id!,
+                                        child: Text(
+                                          bodega.nombre,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) async {
+                                  setState(() => bodegaId = value);
+                                  await fetchDetalle(setState);
+                                },
+                                decoration:
+                                    const InputDecoration(labelText: 'Bodega'),
+                                validator: (value) {
+                                  if (value == null) {
+                                    return 'Seleccione bodega';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ];
+
+                          if (isCompact) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                children[0],
+                                const SizedBox(height: defaultPadding / 2),
+                                children[2],
+                              ],
+                            );
                           }
-                          return null;
+
+                          return Row(children: children);
                         },
                       ),
+                      if (isFetching)
+                        const Padding(
+                          padding: EdgeInsets.only(top: defaultPadding / 2),
+                          child: LinearProgressIndicator(),
+                        ),
                       const SizedBox(height: defaultPadding / 2),
                       TextFormField(
                         controller: stockActualController,
@@ -369,10 +489,18 @@ class _InventariosList extends StatelessWidget {
   final List<Producto> productos;
   final void Function(Inventario inventario) onEdit;
 
-  String _productoNombre(int productoId) {
+  String _productoNombre(Inventario inventario) {
+    final direct = inventario.productoNombre?.trim();
+    if (direct != null && direct.isNotEmpty) {
+      return direct;
+    }
+    final descripcion = inventario.productoDescripcion?.trim();
+    if (descripcion != null && descripcion.isNotEmpty) {
+      return descripcion;
+    }
     return productos
         .firstWhere(
-          (producto) => producto.id == productoId,
+          (producto) => producto.id == inventario.productoId,
           orElse: () => Producto(
             id: 0,
             codigo: '- ',
@@ -404,9 +532,20 @@ class _InventariosList extends StatelessWidget {
             .map(
               (inventario) => Card(
                 child: ListTile(
-                  title: Text(_productoNombre(inventario.productoId)),
+                  title: Text(_productoNombre(inventario)),
                   subtitle: Text(
-                    'Stock: ${inventario.stockActual} (min ${inventario.stockMinimo})',
+                    [
+                      if (inventario.bodegaNombre != null &&
+                          inventario.bodegaNombre!.isNotEmpty)
+                        'Bodega: ${inventario.bodegaNombre}',
+                      'Stock: ${inventario.stockActual} (min ${inventario.stockMinimo})',
+                      if (inventario.precioVenta != null)
+                        'PVP: ${inventario.precioVenta!.toStringAsFixed(2)}',
+                      if ((inventario.margenPorcentaje ??
+                              inventario.margenPorcentajeGlobal) !=
+                          null)
+                        'Margen: ${(inventario.margenPorcentaje ?? inventario.margenPorcentajeGlobal)!.toStringAsFixed(2)}%',
+                    ].join(' · '),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -448,11 +587,14 @@ class _InventariosList extends StatelessWidget {
                 child: DataTable(
                   columns: const [
                     DataColumn(label: Text('Producto')),
+                    DataColumn(label: Text('Bodega')),
                     DataColumn(label: Text('Stock')),
                     DataColumn(label: Text('Min')),
                     DataColumn(label: Text('Max')),
                     DataColumn(label: Text('Ubicacion')),
                     DataColumn(label: Text('Costo promedio')),
+                    DataColumn(label: Text('PVP')),
+                    DataColumn(label: Text('Margen %')),
                     DataColumn(label: Text('Acciones')),
                   ],
                   rows: inventarios
@@ -465,14 +607,29 @@ class _InventariosList extends StatelessWidget {
                           ),
                           cells: [
                             DataCell(
-                              Text(_productoNombre(inventario.productoId)),
+                              Text(_productoNombre(inventario)),
                             ),
+                            DataCell(Text(inventario.bodegaNombre ?? '-')),
                             DataCell(Text(inventario.stockActual.toString())),
                             DataCell(Text(inventario.stockMinimo.toString())),
                             DataCell(Text(inventario.stockMaximo.toString())),
                             DataCell(Text(inventario.ubicacion)),
                             DataCell(
                               Text(inventario.costoPromedio.toStringAsFixed(2)),
+                            ),
+                            DataCell(
+                              Text(
+                                (inventario.precioVenta ?? 0)
+                                    .toStringAsFixed(2),
+                              ),
+                            ),
+                            DataCell(
+                              Text(
+                                (inventario.margenPorcentaje ??
+                                        inventario.margenPorcentajeGlobal ??
+                                        0)
+                                    .toStringAsFixed(2),
+                              ),
                             ),
                             DataCell(
                               IconButton(

@@ -59,21 +59,24 @@ class Preorden {
 class PreordenItem {
   PreordenItem({
     this.id,
+    this.bodegaId,
     required this.productoId,
     required this.cantidad,
     required this.descuento,
   });
 
   final int? id;
+  final int? bodegaId;
   final int productoId;
-  final int cantidad;
+  final double cantidad;
   final double descuento;
 
   factory PreordenItem.fromJson(Map<String, dynamic> json) {
     return PreordenItem(
       id: parseInt(json['id'] ?? json['itemId']),
+      bodegaId: parseInt(json['bodegaId']),
       productoId: parseInt(json['productoId']) ?? 0,
-      cantidad: parseInt(json['cantidad']) ?? 0,
+      cantidad: parseDouble(json['cantidad']) ?? 0,
       descuento: parseDouble(json['descuento']) ?? 0,
     );
   }
@@ -81,6 +84,7 @@ class PreordenItem {
   Map<String, dynamic> toJson() {
     return {
       if (id != null) 'id': id,
+      if (bodegaId != null) 'bodegaId': bodegaId,
       'productoId': productoId,
       'cantidad': cantidad,
       'descuento': descuento,

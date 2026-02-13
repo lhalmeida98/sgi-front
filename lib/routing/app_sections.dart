@@ -9,6 +9,7 @@ enum AppSection {
   impuestos,
   productos,
   clientes,
+  proveedores,
   inventarios,
   bodegas,
   preordenes,
@@ -75,6 +76,13 @@ const List<AppSectionItem> appSections = [
     icon: 'assets/icons/menu_profile.svg',
     description: 'Registro de clientes.',
     color: Color(0xFF6FCF97),
+  ),
+  AppSectionItem(
+    section: AppSection.proveedores,
+    title: 'Proveedores',
+    icon: 'assets/icons/menu_doc.svg',
+    description: 'Gestion de proveedores.',
+    color: Color(0xFF4F9CFB),
   ),
   AppSectionItem(
     section: AppSection.inventarios,

@@ -5,6 +5,7 @@ class Producto {
     this.id,
     this.empresaId,
     required this.codigo,
+    this.codigoBarras,
     required this.descripcion,
     required this.precioUnitario,
     required this.categoriaId,
@@ -16,6 +17,7 @@ class Producto {
   final int? id;
   final int? empresaId;
   final String codigo;
+  final String? codigoBarras;
   final String descripcion;
   final double precioUnitario;
   final int categoriaId;
@@ -28,6 +30,7 @@ class Producto {
       id: parseInt(json['id'] ?? json['productoId']),
       empresaId: parseInt(json['empresaId'] ?? json['empresa']?['id']),
       codigo: (json['codigo'] ?? '').toString(),
+      codigoBarras: json['codigoBarras']?.toString(),
       descripcion: (json['descripcion'] ?? '').toString(),
       precioUnitario: parseDouble(json['precioUnitario']) ?? 0,
       categoriaId: parseInt(json['categoriaId']) ?? 0,
@@ -43,6 +46,8 @@ class Producto {
     return {
       if (id != null) 'id': id,
       'codigo': codigo,
+      if (codigoBarras != null && codigoBarras!.isNotEmpty)
+        'codigoBarras': codigoBarras,
       'descripcion': descripcion,
       'precioUnitario': precioUnitario,
       'categoriaId': categoriaId,

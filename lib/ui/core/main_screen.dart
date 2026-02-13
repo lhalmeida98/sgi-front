@@ -14,6 +14,7 @@ import '../../ui/inventarios_screen.dart';
 import '../../ui/bodegas_screen.dart';
 import '../../ui/preordenes_screen.dart';
 import '../../ui/productos_screen.dart';
+import '../../ui/proveedores_screen.dart';
 import '../../ui/home/dashboard_screen.dart';
 import '../../ui/login_screen.dart';
 import '../../ui/usuarios_screen.dart';
@@ -124,6 +125,8 @@ class _MainShell extends StatelessWidget {
         return const ProductosScreen(key: ValueKey('productos'));
       case AppSection.clientes:
         return const ClientesScreen(key: ValueKey('clientes'));
+      case AppSection.proveedores:
+        return const ProveedoresScreen(key: ValueKey('proveedores'));
       case AppSection.inventarios:
         return const InventariosScreen(key: ValueKey('inventarios'));
       case AppSection.bodegas:

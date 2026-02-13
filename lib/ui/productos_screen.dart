@@ -192,7 +192,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
         .where(
           (producto) =>
               producto.codigo.toLowerCase().contains(lower) ||
-              producto.descripcion.toLowerCase().contains(lower),
+              producto.descripcion.toLowerCase().contains(lower) ||
+              (producto.codigoBarras ?? '').toLowerCase().contains(lower),
         )
         .toList();
   }
@@ -207,6 +208,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
     final formKey = GlobalKey<FormState>();
     final codigoController =
         TextEditingController(text: producto?.codigo ?? '');
+    final codigoBarrasController =
+        TextEditingController(text: producto?.codigoBarras ?? '');
     final descripcionController =
         TextEditingController(text: producto?.descripcion ?? '');
     final precioController = TextEditingController(
@@ -238,6 +241,12 @@ class _ProductosScreenState extends State<ProductosScreen> {
                           }
                           return null;
                         },
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: codigoBarrasController,
+                        decoration:
+                            const InputDecoration(labelText: 'Codigo de barras'),
                       ),
                       const SizedBox(height: defaultPadding / 2),
                       TextFormField(
@@ -336,6 +345,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                 final payload = Producto(
                   id: producto?.id,
                   codigo: codigoController.text.trim(),
+                  codigoBarras: codigoBarrasController.text.trim(),
                   descripcion: descripcionController.text.trim(),
                   precioUnitario:
                       double.tryParse(precioController.text.trim()) ?? 0,
@@ -372,6 +382,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
     );
 
     codigoController.dispose();
+    codigoBarrasController.dispose();
     descripcionController.dispose();
     precioController.dispose();
   }
@@ -435,7 +446,7 @@ class _ProductosList extends StatelessWidget {
                 child: ListTile(
                   title: Text('${producto.codigo} - ${producto.descripcion}'),
                   subtitle: Text(
-                    'Precio: ${producto.precioUnitario.toStringAsFixed(2)} | ${_categoriaNombre(producto.categoriaId)}',
+                    'Precio: ${producto.precioUnitario.toStringAsFixed(2)} | ${_categoriaNombre(producto.categoriaId)}${producto.codigoBarras == null || producto.codigoBarras!.isEmpty ? '' : ' | Barra: ${producto.codigoBarras}'}',
                   ),
                   trailing: IconButton(
                     icon: const Icon(Icons.edit_outlined),
@@ -468,6 +479,7 @@ class _ProductosList extends StatelessWidget {
                 child: DataTable(
                   columns: const [
                     DataColumn(label: Text('Codigo')),
+                    DataColumn(label: Text('Codigo barras')),
                     DataColumn(label: Text('Descripcion')),
                     DataColumn(label: Text('Precio')),
                     DataColumn(label: Text('Categoria')),
@@ -479,6 +491,7 @@ class _ProductosList extends StatelessWidget {
                         (producto) => DataRow(
                           cells: [
                             DataCell(Text(producto.codigo)),
+                            DataCell(Text(producto.codigoBarras ?? '-')),
                             DataCell(Text(producto.descripcion)),
                             DataCell(
                               Text(producto.precioUnitario.toStringAsFixed(2)),

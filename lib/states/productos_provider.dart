@@ -1,4 +1,5 @@
 import '../domain/models/producto.dart';
+import '../services/api_client.dart';
 import '../services/productos_service.dart';
 import 'base_provider.dart';
 
@@ -46,5 +47,38 @@ class ProductosProvider extends BaseProvider {
     } finally {
       setLoading(false);
     }
+  }
+
+  Future<Producto?> fetchProductoByCodigo(String codigo) async {
+    try {
+      final producto = await _service.fetchProductoByCodigo(codigo);
+      final exists = productos.any((item) => item.id == producto.id);
+      if (!exists) {
+        productos = [...productos, producto];
+        notifyListeners();
+      }
+      setError(null);
+      return producto;
+    } on ApiException catch (error) {
+      if (error.statusCode != 404) {
+        setError(resolveError(error));
+      } else {
+        setError(null);
+      }
+      return null;
+    } catch (error) {
+      setError(resolveError(error));
+      return null;
+    }
+  }
+
+  void upsertProductoLocal(Producto producto) {
+    final index = productos.indexWhere((item) => item.id == producto.id);
+    if (index >= 0) {
+      productos[index] = producto;
+    } else {
+      productos = [...productos, producto];
+    }
+    notifyListeners();
   }
 }

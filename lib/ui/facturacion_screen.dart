@@ -6,22 +6,31 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../domain/models/cliente.dart';
+import '../domain/models/bodega.dart';
 import '../domain/models/empresa.dart';
 import '../domain/models/factura.dart';
 import '../domain/models/impuesto.dart';
+import '../domain/models/inventario_producto_disponible.dart';
+import '../domain/models/preorden.dart';
 import '../domain/models/producto.dart';
 import '../resource/theme/dimens.dart';
 import '../services/api_client.dart';
+import '../services/bodegas_service.dart';
 import '../services/clientes_service.dart';
 import '../services/empresas_service.dart';
 import '../services/facturas_service.dart';
 import '../services/impuestos_service.dart';
+import '../services/inventarios_service.dart';
+import '../services/preordenes_service.dart';
 import '../services/productos_service.dart';
 import '../states/auth_provider.dart';
+import '../states/bodegas_provider.dart';
 import '../states/clientes_provider.dart';
 import '../states/empresas_provider.dart';
 import '../states/facturas_provider.dart';
 import '../states/impuestos_provider.dart';
+import '../states/inventarios_provider.dart';
+import '../states/preordenes_provider.dart';
 import '../states/productos_provider.dart';
 import 'facturacion/factura_notifications.dart';
 import '../ui/shared/feedback.dart';
@@ -50,6 +59,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
   FacturacionSection _section = FacturacionSection.facturar;
   int? _empresaId;
   int? _clienteId;
+  int? _bodegaId;
   String _moneda = 'USD';
   DateTime? _fechaEmision;
   int? _empresaIdProceso;
@@ -67,7 +77,11 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
   late final ProductosProvider _productosProvider;
   late final ImpuestosProvider _impuestosProvider;
   late final FacturasProvider _facturasProvider;
+  late final BodegasProvider _bodegasProvider;
+  late final InventariosProvider _inventariosProvider;
+  late final PreordenesProvider _preordenesProvider;
   bool _empresaPrefillDone = false;
+  bool _bodegaPrefillDone = false;
   int _codigoNumericoSecuencia = 0;
 
   @override
@@ -79,11 +93,16 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     _productosProvider = ProductosProvider(ProductosService(_client));
     _impuestosProvider = ImpuestosProvider(ImpuestosService(_client));
     _facturasProvider = FacturasProvider(FacturasService(_client));
+    _bodegasProvider = BodegasProvider(BodegasService(_client));
+    _inventariosProvider = InventariosProvider(InventariosService(_client));
+    _preordenesProvider = PreordenesProvider(PreordenesService(_client));
 
     _empresasProvider.fetchEmpresas();
     _clientesProvider.fetchClientes();
     _productosProvider.fetchProductos();
     _impuestosProvider.fetchImpuestos();
+    _bodegasProvider.fetchBodegas();
+    _inventariosProvider.clearProductosDisponibles();
     _setNextCodigoNumerico();
   }
 
@@ -94,6 +113,9 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     _productosProvider.dispose();
     _impuestosProvider.dispose();
     _facturasProvider.dispose();
+    _bodegasProvider.dispose();
+    _inventariosProvider.dispose();
+    _preordenesProvider.dispose();
     _dirEstablecimientoController.dispose();
     _codigoNumericoController.dispose();
     _observacionesController.dispose();
@@ -124,12 +146,16 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         ChangeNotifierProvider.value(value: _productosProvider),
         ChangeNotifierProvider.value(value: _impuestosProvider),
         ChangeNotifierProvider.value(value: _facturasProvider),
+        ChangeNotifierProvider.value(value: _bodegasProvider),
+        ChangeNotifierProvider.value(value: _inventariosProvider),
       ],
       child: Consumer5<EmpresasProvider, ClientesProvider, ProductosProvider,
           ImpuestosProvider, FacturasProvider>(
         builder: (context, empresasProvider, clientesProvider,
             productosProvider, impuestosProvider, facturasProvider, _) {
           final authProvider = context.watch<AuthProvider>();
+          final bodegasProvider = context.watch<BodegasProvider>();
+          final inventariosProvider = context.watch<InventariosProvider>();
           final empresaId = authProvider.empresaId;
           final empresas = empresaId == null
               ? empresasProvider.empresas
@@ -163,16 +189,62 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                         impuesto.empresaId == empresaId,
                   )
                   .toList();
+          final bodegas = empresaId == null
+              ? bodegasProvider.bodegas
+              : bodegasProvider.bodegas
+                  .where(
+                    (bodega) =>
+                        bodega.empresaId == null || bodega.empresaId == empresaId,
+                  )
+                  .toList();
+          final productosDisponibles =
+              inventariosProvider.productosDisponibles;
+          final disponiblesBodegaId =
+              inventariosProvider.productosDisponiblesBodegaId;
           final isLoading = empresasProvider.isLoading ||
               clientesProvider.isLoading ||
               productosProvider.isLoading ||
               impuestosProvider.isLoading ||
-              facturasProvider.isLoading;
+              facturasProvider.isLoading ||
+              bodegasProvider.isLoading ||
+              inventariosProvider.isLoading;
           final errorMessage = empresasProvider.errorMessage ??
               clientesProvider.errorMessage ??
               productosProvider.errorMessage ??
               impuestosProvider.errorMessage ??
-              facturasProvider.errorMessage;
+              facturasProvider.errorMessage ??
+              bodegasProvider.errorMessage ??
+              inventariosProvider.errorMessage;
+
+          if (!_bodegaPrefillDone) {
+            final firstBodegaId = bodegas
+                .firstWhere(
+                  (bodega) => bodega.id != null,
+                  orElse: () => Bodega(
+                    id: null,
+                    nombre: '',
+                    descripcion: '',
+                    direccion: '',
+                    activa: true,
+                  ),
+                )
+                .id;
+            if (firstBodegaId != null) {
+              _bodegaPrefillDone = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) {
+                  return;
+                }
+                setState(() {
+                  _bodegaId = firstBodegaId;
+                  for (final item in _items) {
+                    item.bodegaId ??= firstBodegaId;
+                  }
+                });
+                _inventariosProvider.fetchProductosDisponibles(firstBodegaId);
+              });
+            }
+          }
 
           if (_empresaId != null &&
               _dirEstablecimientoController.text.isEmpty) {
@@ -248,9 +320,13 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                       clientes: clientes,
                       productos: productos,
                       impuestos: impuestos,
+                      bodegas: bodegas,
+                      disponibles: productosDisponibles,
+                      disponiblesBodegaId: disponiblesBodegaId,
                       canSelectEmpresa: authProvider.isAdmin,
                       empresaId: _empresaId,
                       clienteId: _clienteId,
+                      bodegaId: _bodegaId,
                       moneda: _moneda,
                       fechaEmision: _fechaEmision,
                       dirEstablecimientoController: _dirEstablecimientoController,
@@ -264,6 +340,11 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                       onEmpresaChanged: (value) {
                         setState(() {
                           _empresaId = value;
+                          _bodegaId = null;
+                          _bodegaPrefillDone = false;
+                          for (final item in _items) {
+                            item.bodegaId = null;
+                          }
                           final empresa = empresas.firstWhere(
                             (item) => item.id == value,
                             orElse: () => Empresa(
@@ -281,6 +362,20 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                           );
                           _dirEstablecimientoController.text = empresa.dirMatriz;
                         });
+                        _inventariosProvider.clearProductosDisponibles();
+                      },
+                      onBodegaChanged: (value) {
+                        setState(() {
+                          _bodegaId = value;
+                          for (final item in _items) {
+                            item.bodegaId = value;
+                          }
+                        });
+                        if (value == null) {
+                          _inventariosProvider.clearProductosDisponibles();
+                        } else {
+                          _inventariosProvider.fetchProductosDisponibles(value);
+                        }
                       },
                       onClienteChanged: (value) {
                         setState(() {
@@ -399,6 +494,65 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
       );
       return;
     }
+    final bodegas = _empresaId == null
+        ? _bodegasProvider.bodegas
+        : _bodegasProvider.bodegas
+            .where(
+              (bodega) =>
+                  bodega.empresaId == null || bodega.empresaId == _empresaId,
+            )
+            .toList();
+    if (bodegas.where((bodega) => bodega.id != null).isEmpty) {
+      showAppToast(
+        providerContext,
+        'Registra bodegas para facturar.',
+        isError: true,
+      );
+      return;
+    }
+    if (_items.any((item) => (item.bodegaId ?? _bodegaId) == null)) {
+      showAppToast(
+        providerContext,
+        'Asigna bodega a todos los items.',
+        isError: true,
+      );
+      return;
+    }
+    final requiredByKey = <String, double>{};
+    for (final item in _items) {
+      final productoId = item.productoId;
+      final bodegaId = item.bodegaId ?? _bodegaId;
+      if (productoId == null || bodegaId == null) {
+        continue;
+      }
+      final key = '$productoId@$bodegaId';
+      requiredByKey[key] = (requiredByKey[key] ?? 0) + item.cantidad;
+    }
+    for (final entry in requiredByKey.entries) {
+      final parts = entry.key.split('@');
+      final productoId = int.tryParse(parts.first);
+      final bodegaId = int.tryParse(parts.last);
+      if (productoId == null || bodegaId == null) {
+        continue;
+      }
+      var disponible = _inventariosProvider.getDisponible(
+        productoId,
+        bodegaId,
+      );
+      disponible ??= await _inventariosProvider.fetchProductoDisponibleDetalle(
+        bodegaId: bodegaId,
+        productoId: productoId,
+      );
+      final stockDisponible = disponible?.stockDisponible ?? 0;
+      if (stockDisponible < entry.value) {
+        showAppToast(
+          providerContext,
+          'Stock insuficiente para uno o mas items.',
+          isError: true,
+        );
+        return;
+      }
+    }
     if (_pagos.any((pago) => pago.monto <= 0)) {
       showAppToast(
         providerContext,
@@ -444,6 +598,24 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
 
     final preordenId = int.tryParse(_preordenIdController.text.trim());
 
+    final productos = _empresaId == null
+        ? _productosProvider.productos
+        : _productosProvider.productos
+            .where(
+              (producto) =>
+                  producto.empresaId == null || producto.empresaId == _empresaId,
+            )
+            .toList();
+    final impuestos = _empresaId == null
+        ? _impuestosProvider.impuestos
+        : _impuestosProvider.impuestos
+            .where(
+              (impuesto) =>
+                  impuesto.empresaId == null || impuesto.empresaId == _empresaId,
+            )
+            .toList();
+    final totals = _FacturacionTotals.fromData(_items, productos, impuestos);
+
     final payload = <String, dynamic>{
       'empresaId': _empresaId,
       'clienteId': _clienteId,
@@ -456,12 +628,13 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
           .map(
             (item) => {
               'productoId': item.productoId,
+              'bodegaId': item.bodegaId ?? _bodegaId,
               'cantidad': item.cantidad,
               'descuento': item.descuento,
             },
           )
           .toList(),
-      'pagos': _buildPagosPayload(),
+      'pagos': _buildPagosPayload(totals.total),
     };
 
     await _procesarFactura(providerContext, payload);
@@ -522,6 +695,76 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     _resetFacturaForm();
   }
 
+  Future<void> _guardarPreordenDesdeFactura(BuildContext providerContext) async {
+    if (_empresaId == null || _clienteId == null) {
+      showAppToast(
+        providerContext,
+        'Selecciona empresa y cliente.',
+        isError: true,
+      );
+      return;
+    }
+    if (_items.any((item) => (item.bodegaId ?? _bodegaId) == null)) {
+      showAppToast(
+        providerContext,
+        'Asigna bodega a todos los items.',
+        isError: true,
+      );
+      return;
+    }
+    if (_items.any((item) => item.productoId == null || item.cantidad <= 0)) {
+      showAppToast(
+        providerContext,
+        'Completa los items con producto y cantidad.',
+        isError: true,
+      );
+      return;
+    }
+    final baseObs = _observacionesController.text.trim();
+    final observaciones = baseObs.isEmpty
+        ? 'Generado desde factura no autorizada'
+        : '$baseObs\nGenerado desde factura no autorizada';
+    final payload = Preorden(
+      empresaId: _empresaId!,
+      clienteId: _clienteId!,
+      dirEstablecimiento: _dirEstablecimientoController.text.trim(),
+      moneda: _moneda,
+      observaciones: observaciones,
+      reservaInventario: true,
+      items: _items
+          .where((item) => item.productoId != null)
+          .map(
+            (item) => PreordenItem(
+              bodegaId: item.bodegaId ?? _bodegaId,
+              productoId: item.productoId!,
+              cantidad: item.cantidad.toDouble(),
+              descuento: item.descuento,
+            ),
+          )
+          .toList(),
+    );
+    showFacturaProcessingDialog(
+      context: providerContext,
+      title: 'Guardando preorden...',
+      message: 'Estamos registrando la preorden. Por favor, espera.',
+    );
+    final ok = await _preordenesProvider.createPreorden(payload);
+    if (!providerContext.mounted) {
+      return;
+    }
+    Navigator.of(providerContext).pop();
+    if (!ok) {
+      showAppToast(
+        providerContext,
+        _preordenesProvider.errorMessage ??
+            'No se pudo guardar la preorden.',
+        isError: true,
+      );
+      return;
+    }
+    showAppToast(providerContext, 'Preorden guardada.');
+  }
+
   void _resetFacturaForm() {
     _dirEstablecimientoController.clear();
     _setNextCodigoNumerico();
@@ -532,6 +775,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     setState(() {
       _empresaId = null;
       _clienteId = null;
+      _bodegaId = null;
+      _bodegaPrefillDone = false;
       _moneda = 'USD';
       _fechaEmision = null;
       _items
@@ -541,6 +786,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         ..clear()
         ..add(_PagoDraft(formaPago: 'EFECTIVO', monto: 0));
     });
+    _inventariosProvider.clearProductosDisponibles();
   }
 
   String _normalizeEstado(String? estado) {
@@ -596,6 +842,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
       case 'AUTORIZADA':
       case 'AUTORIZADO':
         return Colors.green;
+      case 'NO_AUTORIZADA':
+        return Colors.amber.shade700;
       case 'ENVIADA':
       case 'RECIBIDA':
       case 'RECIBIDO':
@@ -678,6 +926,9 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     Color? statusColor;
 
     final messageDetail = factura.mensaje?.trim();
+    final sriConsulta = factura.sriEstadoConsulta?.trim();
+    final sriAutorizacion = factura.sriEstadoAutorizacion?.trim();
+    final sriMensaje = factura.sriMensaje?.trim();
     FacturaNoticeVariant variant = FacturaNoticeVariant.info;
     String title = 'Factura generada';
     String message = 'El comprobante #$numero fue registrado en el sistema.';
@@ -710,6 +961,13 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         variant = FacturaNoticeVariant.error;
         title = 'No pudimos autorizar la factura';
         message = 'El comprobante #$numero presento un inconveniente.';
+        break;
+      case 'NO_AUTORIZADA':
+        variant = FacturaNoticeVariant.warning;
+        title = 'Factura no autorizada';
+        message = 'El comprobante #$numero no fue autorizado.';
+        statusLabel = 'Estado: NO_AUTORIZADA';
+        statusColor = Colors.amber.shade700;
         break;
       case 'EN_PROCESO':
         variant = FacturaNoticeVariant.info;
@@ -758,6 +1016,38 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
       actions.add(
         FacturaNoticeAction(
           label: 'Cancelar',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      );
+    } else if (variant == FacturaNoticeVariant.warning &&
+        estado == 'NO_AUTORIZADA') {
+      final detailLines = <String>[
+        'Estado: $estado',
+        if (sriConsulta != null && sriConsulta.isNotEmpty)
+          'Estado SRI: $sriConsulta',
+        if (sriAutorizacion != null && sriAutorizacion.isNotEmpty)
+          'Autorizacion SRI: $sriAutorizacion',
+        if (sriMensaje != null && sriMensaje.isNotEmpty)
+          'Mensaje SRI: $sriMensaje',
+        if (messageDetail != null &&
+            messageDetail.isNotEmpty &&
+            messageDetail != sriMensaje)
+          messageDetail,
+      ];
+      detail = detailLines.join('\n');
+      actions.add(
+        FacturaNoticeAction(
+          label: 'Guardar como preorden',
+          isPrimary: true,
+          onPressed: () {
+            Navigator.of(context).pop();
+            _guardarPreordenDesdeFactura(context);
+          },
+        ),
+      );
+      actions.add(
+        FacturaNoticeAction(
+          label: 'Cerrar',
           onPressed: () => Navigator.of(context).pop(),
         ),
       );
@@ -1090,13 +1380,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     return '${date.year}-$month-$day';
   }
 
-  List<Map<String, dynamic>> _buildPagosPayload() {
-    final totals = _FacturacionTotals.fromData(
-      _items,
-      _productosProvider.productos,
-      _impuestosProvider.impuestos,
-    );
-    var remaining = totals.total;
+  List<Map<String, dynamic>> _buildPagosPayload(double totalFactura) {
+    var remaining = totalFactura;
     final payload = <Map<String, dynamic>>[];
 
     for (final pago in _pagos.where((p) => p.formaPago != 'EFECTIVO')) {
@@ -1137,9 +1422,13 @@ class _FacturarView extends StatelessWidget {
     required this.clientes,
     required this.productos,
     required this.impuestos,
+    required this.bodegas,
+    required this.disponibles,
+    required this.disponiblesBodegaId,
     required this.canSelectEmpresa,
     required this.empresaId,
     required this.clienteId,
+    required this.bodegaId,
     required this.moneda,
     required this.fechaEmision,
     required this.dirEstablecimientoController,
@@ -1151,6 +1440,7 @@ class _FacturarView extends StatelessWidget {
     required this.items,
     required this.pagos,
     required this.onEmpresaChanged,
+    required this.onBodegaChanged,
     required this.onClienteChanged,
     required this.onMonedaChanged,
     required this.onFechaChanged,
@@ -1163,9 +1453,13 @@ class _FacturarView extends StatelessWidget {
   final List<Cliente> clientes;
   final List<Producto> productos;
   final List<Impuesto> impuestos;
+  final List<Bodega> bodegas;
+  final List<InventarioProductoDisponible> disponibles;
+  final int? disponiblesBodegaId;
   final bool canSelectEmpresa;
   final int? empresaId;
   final int? clienteId;
+  final int? bodegaId;
   final String moneda;
   final DateTime? fechaEmision;
   final TextEditingController dirEstablecimientoController;
@@ -1177,6 +1471,7 @@ class _FacturarView extends StatelessWidget {
   final List<_FacturaItemDraft> items;
   final List<_PagoDraft> pagos;
   final ValueChanged<int?> onEmpresaChanged;
+  final ValueChanged<int?> onBodegaChanged;
   final ValueChanged<int?> onClienteChanged;
   final ValueChanged<String> onMonedaChanged;
   final VoidCallback onFechaChanged;
@@ -1212,6 +1507,8 @@ class _FacturarView extends StatelessWidget {
                 clienteId: clienteId,
                 selectedCliente: selectedCliente,
                 canSelectEmpresa: canSelectEmpresa,
+                bodegas: bodegas,
+                bodegaId: bodegaId,
                 moneda: moneda,
                 fechaEmision: fechaEmision,
                 dirEstablecimientoController: dirEstablecimientoController,
@@ -1221,6 +1518,7 @@ class _FacturarView extends StatelessWidget {
                 clienteEmailController: clienteEmailController,
                 clienteDireccionController: clienteDireccionController,
                 onEmpresaChanged: onEmpresaChanged,
+                onBodegaChanged: onBodegaChanged,
                 onClienteChanged: onClienteChanged,
                 onMonedaChanged: onMonedaChanged,
                 onFechaChanged: onFechaChanged,
@@ -1241,12 +1539,14 @@ class _FacturarView extends StatelessWidget {
                 child: _FacturaDatosCard(
                   empresas: empresas,
                   clientes: clientes,
-                empresaId: empresaId,
-                clienteId: clienteId,
-                selectedCliente: selectedCliente,
-                canSelectEmpresa: canSelectEmpresa,
-                moneda: moneda,
-                fechaEmision: fechaEmision,
+                  empresaId: empresaId,
+                  clienteId: clienteId,
+                  selectedCliente: selectedCliente,
+                  canSelectEmpresa: canSelectEmpresa,
+                  bodegas: bodegas,
+                  bodegaId: bodegaId,
+                  moneda: moneda,
+                  fechaEmision: fechaEmision,
                   dirEstablecimientoController: dirEstablecimientoController,
                   codigoNumericoController: codigoNumericoController,
                   observacionesController: observacionesController,
@@ -1254,6 +1554,7 @@ class _FacturarView extends StatelessWidget {
                   clienteEmailController: clienteEmailController,
                   clienteDireccionController: clienteDireccionController,
                   onEmpresaChanged: onEmpresaChanged,
+                  onBodegaChanged: onBodegaChanged,
                   onClienteChanged: onClienteChanged,
                   onMonedaChanged: onMonedaChanged,
                   onFechaChanged: onFechaChanged,
@@ -1278,12 +1579,14 @@ class _FacturarView extends StatelessWidget {
                 child: _FacturaDatosCard(
                   empresas: empresas,
                   clientes: clientes,
-                empresaId: empresaId,
-                clienteId: clienteId,
-                selectedCliente: selectedCliente,
-                canSelectEmpresa: canSelectEmpresa,
-                moneda: moneda,
-                fechaEmision: fechaEmision,
+                  empresaId: empresaId,
+                  clienteId: clienteId,
+                  selectedCliente: selectedCliente,
+                  canSelectEmpresa: canSelectEmpresa,
+                  bodegas: bodegas,
+                  bodegaId: bodegaId,
+                  moneda: moneda,
+                  fechaEmision: fechaEmision,
                   dirEstablecimientoController: dirEstablecimientoController,
                   codigoNumericoController: codigoNumericoController,
                   observacionesController: observacionesController,
@@ -1291,6 +1594,7 @@ class _FacturarView extends StatelessWidget {
                   clienteEmailController: clienteEmailController,
                   clienteDireccionController: clienteDireccionController,
                   onEmpresaChanged: onEmpresaChanged,
+                  onBodegaChanged: onBodegaChanged,
                   onClienteChanged: onClienteChanged,
                   onMonedaChanged: onMonedaChanged,
                   onFechaChanged: onFechaChanged,
@@ -1313,6 +1617,10 @@ class _FacturarView extends StatelessWidget {
           items: items,
           productos: productos,
           impuestos: impuestos,
+          bodegas: bodegas,
+          disponibles: disponibles,
+          disponiblesBodegaId: disponiblesBodegaId,
+          defaultBodegaId: bodegaId,
           onChanged: onItemsChanged,
         ),
         const SizedBox(height: defaultPadding),
@@ -1337,6 +1645,8 @@ class _FacturaDatosCard extends StatelessWidget {
     required this.clienteId,
     required this.selectedCliente,
     required this.canSelectEmpresa,
+    required this.bodegas,
+    required this.bodegaId,
     required this.moneda,
     required this.fechaEmision,
     required this.dirEstablecimientoController,
@@ -1346,6 +1656,7 @@ class _FacturaDatosCard extends StatelessWidget {
     required this.clienteEmailController,
     required this.clienteDireccionController,
     required this.onEmpresaChanged,
+    required this.onBodegaChanged,
     required this.onClienteChanged,
     required this.onMonedaChanged,
     required this.onFechaChanged,
@@ -1357,6 +1668,8 @@ class _FacturaDatosCard extends StatelessWidget {
   final int? clienteId;
   final Cliente selectedCliente;
   final bool canSelectEmpresa;
+  final List<Bodega> bodegas;
+  final int? bodegaId;
   final String moneda;
   final DateTime? fechaEmision;
   final TextEditingController dirEstablecimientoController;
@@ -1366,12 +1679,20 @@ class _FacturaDatosCard extends StatelessWidget {
   final TextEditingController clienteEmailController;
   final TextEditingController clienteDireccionController;
   final ValueChanged<int?> onEmpresaChanged;
+  final ValueChanged<int?> onBodegaChanged;
   final ValueChanged<int?> onClienteChanged;
   final ValueChanged<String> onMonedaChanged;
   final VoidCallback onFechaChanged;
 
   @override
   Widget build(BuildContext context) {
+    final availableBodegas =
+        bodegas.where((bodega) => bodega.id != null).toList();
+    final selectedBodegaId = availableBodegas.any(
+      (bodega) => bodega.id == bodegaId,
+    )
+        ? bodegaId
+        : null;
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
@@ -1509,14 +1830,39 @@ class _FacturaDatosCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: defaultPadding / 2),
-                  OutlinedButton.icon(
-                    onPressed: onFechaChanged,
-                    icon: const Icon(Icons.event),
-                    label: Text(
-                      fechaEmision == null
-                          ? 'Fecha de emision'
-                          : _formatDate(fechaEmision!),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onFechaChanged,
+                          icon: const Icon(Icons.event),
+                          label: Text(
+                            fechaEmision == null
+                                ? 'Fecha de emision'
+                                : _formatDate(fechaEmision!),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: defaultPadding / 2),
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: selectedBodegaId,
+                          items: availableBodegas
+                              .map(
+                                (bodega) => DropdownMenuItem(
+                                  value: bodega.id,
+                                  child: Text(bodega.nombre),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: availableBodegas.isEmpty
+                              ? null
+                              : onBodegaChanged,
+                          decoration:
+                              const InputDecoration(labelText: 'Bodega'),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: defaultPadding / 2),
                   TextFormField(
@@ -1716,25 +2062,262 @@ class _PagoResumenCard extends StatelessWidget {
   }
 }
 
-class _FacturaItemsCard extends StatelessWidget {
+class _FacturaItemsCard extends StatefulWidget {
   const _FacturaItemsCard({
     required this.items,
     required this.productos,
     required this.impuestos,
+    required this.bodegas,
+    required this.disponibles,
+    required this.disponiblesBodegaId,
+    required this.defaultBodegaId,
     required this.onChanged,
   });
 
   final List<_FacturaItemDraft> items;
   final List<Producto> productos;
   final List<Impuesto> impuestos;
+  final List<Bodega> bodegas;
+  final List<InventarioProductoDisponible> disponibles;
+  final int? disponiblesBodegaId;
+  final int? defaultBodegaId;
   final VoidCallback onChanged;
 
   @override
+  State<_FacturaItemsCard> createState() => _FacturaItemsCardState();
+}
+
+class _FacturaItemsCardState extends State<_FacturaItemsCard> {
+  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _codigoController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  final FocusNode _codigoFocus = FocusNode();
+  final Map<String, InventarioProductoDisponible> _detalleDisponibles = {};
+  final Set<String> _sinStockKeys = {};
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _codigoController.dispose();
+    _searchFocus.dispose();
+    _codigoFocus.dispose();
+    super.dispose();
+  }
+
+  void _addItemForProducto(Producto producto) {
+    widget.items.add(
+      _FacturaItemDraft(
+        cantidad: 1,
+        descuento: 0,
+        productoId: producto.id,
+        bodegaId: widget.defaultBodegaId,
+      ),
+    );
+    widget.onChanged();
+  }
+
+  void _addItemForDisponible(InventarioProductoDisponible disponible) {
+    final producto = Producto(
+      id: disponible.productoId,
+      codigo: disponible.codigo,
+      codigoBarras: disponible.codigoBarras,
+      descripcion: disponible.descripcion,
+      precioUnitario: disponible.precioUnitario,
+      categoriaId: disponible.categoriaId,
+      impuestoId: disponible.impuestoId,
+    );
+    context.read<ProductosProvider>().upsertProductoLocal(producto);
+    widget.items.add(
+      _FacturaItemDraft(
+        cantidad: 1,
+        descuento: 0,
+        productoId: disponible.productoId,
+        bodegaId: disponible.bodegaId,
+      ),
+    );
+    _cacheDisponible(disponible);
+    widget.onChanged();
+  }
+
+  String _keyFor(int productoId, int bodegaId) => '$productoId@$bodegaId';
+
+  void _cacheDisponible(InventarioProductoDisponible disponible) {
+    final key = _keyFor(disponible.productoId, disponible.bodegaId);
+    _detalleDisponibles[key] = disponible;
+    _sinStockKeys.remove(key);
+  }
+
+  InventarioProductoDisponible? _lookupDisponible(
+    int? productoId,
+    int? bodegaId,
+  ) {
+    if (productoId == null || bodegaId == null) {
+      return null;
+    }
+    final key = _keyFor(productoId, bodegaId);
+    final cached = _detalleDisponibles[key];
+    if (cached != null) {
+      return cached;
+    }
+    for (final disponible in widget.disponibles) {
+      if (disponible.productoId == productoId &&
+          disponible.bodegaId == bodegaId) {
+        return disponible;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _ensureDisponibleDetalle({
+    required int productoId,
+    required int bodegaId,
+  }) async {
+    final key = _keyFor(productoId, bodegaId);
+    if (_detalleDisponibles.containsKey(key)) {
+      return;
+    }
+    final inventariosProvider = context.read<InventariosProvider>();
+    final disponible = await inventariosProvider.fetchProductoDisponibleDetalle(
+      bodegaId: bodegaId,
+      productoId: productoId,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (disponible == null) {
+      _detalleDisponibles.remove(key);
+      _sinStockKeys.add(key);
+    } else {
+      _cacheDisponible(disponible);
+    }
+    setState(() {});
+  }
+
+  void _handleCodigoSubmit(String value) async {
+    final codigo = value.trim();
+    if (codigo.isEmpty) {
+      return;
+    }
+    final bodegaId = widget.defaultBodegaId;
+    if (bodegaId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona una bodega primero.')),
+      );
+      return;
+    }
+    final inventariosProvider = context.read<InventariosProvider>();
+    final disponible = await inventariosProvider.fetchProductoDisponibleByCodigo(
+      bodegaId: bodegaId,
+      codigo: codigo,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (disponible == null) {
+      final message = inventariosProvider.errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            message != null && message.isNotEmpty
+                ? message
+                : 'Producto no encontrado.',
+          ),
+        ),
+      );
+    } else {
+      _addItemForDisponible(disponible);
+    }
+    _codigoController.clear();
+    _codigoFocus.requestFocus();
+  }
+
+  List<Producto> _filterProductos(List<Producto> productos, String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return productos;
+    }
+    return productos.where((producto) {
+      final codigo = producto.codigo.toLowerCase();
+      final barras = (producto.codigoBarras ?? '').toLowerCase();
+      final descripcion = producto.descripcion.toLowerCase();
+      return codigo.contains(normalized) ||
+          barras.contains(normalized) ||
+          descripcion.contains(normalized);
+    }).toList();
+  }
+
+  List<Producto> _withSelectedProducto(
+    List<Producto> productos,
+    int? selectedId,
+  ) {
+    if (selectedId == null) {
+      return productos;
+    }
+    final hasSelected = productos.any((producto) => producto.id == selectedId);
+    if (hasSelected) {
+      return productos;
+    }
+    final selected = widget.productos
+        .cast<Producto?>()
+        .firstWhere((producto) => producto?.id == selectedId, orElse: () => null);
+    if (selected == null) {
+      return productos;
+    }
+    return [selected, ...productos];
+  }
+
+  Iterable<InventarioProductoDisponible> _filterDisponibles(
+    List<InventarioProductoDisponible> disponibles,
+    String query,
+  ) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return const Iterable<InventarioProductoDisponible>.empty();
+    }
+    return disponibles.where((item) {
+      final codigo = item.codigo.toLowerCase();
+      final barras = (item.codigoBarras ?? '').toLowerCase();
+      final descripcion = item.descripcion.toLowerCase();
+      return codigo.contains(normalized) ||
+          barras.contains(normalized) ||
+          descripcion.contains(normalized);
+    });
+  }
+
+  String _formatStock(double value) {
+    final rounded = double.parse(value.toStringAsFixed(2));
+    if (rounded == rounded.roundToDouble()) {
+      return rounded.toStringAsFixed(0);
+    }
+    return rounded.toStringAsFixed(2);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final items = widget.items;
+    final productos = widget.productos;
+    final impuestos = widget.impuestos;
+    final theme = Theme.of(context);
+    final availableBodegas =
+        widget.bodegas.where((bodega) => bodega.id != null).toList();
+    final loadedForDefault = widget.defaultBodegaId != null &&
+        widget.disponiblesBodegaId == widget.defaultBodegaId;
+    final filteredProductos = _filterProductos(productos, _searchQuery);
+    final requiredByKey = <String, double>{};
+    for (final item in items) {
+      final productoId = item.productoId;
+      final bodegaId = item.bodegaId ?? widget.defaultBodegaId;
+      if (productoId == null || bodegaId == null) {
+        continue;
+      }
+      final key = _keyFor(productoId, bodegaId);
+      requiredByKey[key] = (requiredByKey[key] ?? 0) + item.cantidad;
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
-        final cardWidth = maxWidth > 1100 ? 980.0 : maxWidth;
+        final cardWidth = maxWidth;
         return Align(
           alignment: Alignment.topCenter,
           child: SizedBox(
@@ -1756,9 +2339,13 @@ class _FacturaItemsCard extends StatelessWidget {
                       TextButton.icon(
                         onPressed: () {
                           items.add(
-                            _FacturaItemDraft(cantidad: 1, descuento: 0),
+                            _FacturaItemDraft(
+                              cantidad: 1,
+                              descuento: 0,
+                              bodegaId: widget.defaultBodegaId,
+                            ),
                           );
-                          onChanged();
+                          widget.onChanged();
                         },
                         icon: const Icon(Icons.add),
                         label: const Text('Agregar'),
@@ -1766,9 +2353,149 @@ class _FacturaItemsCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: defaultPadding / 2),
+                  Wrap(
+                    spacing: defaultPadding / 2,
+                    runSpacing: defaultPadding / 2,
+                    children: [
+                      SizedBox(
+                        width: 320,
+                        child: RawAutocomplete<InventarioProductoDisponible>(
+                          textEditingController: _searchController,
+                          focusNode: _searchFocus,
+                          displayStringForOption: (disponible) =>
+                              '${disponible.codigo} - ${disponible.descripcion}',
+                          optionsBuilder: (value) {
+                            final query = value.text;
+                            return _filterDisponibles(
+                              widget.disponibles,
+                              query,
+                            ).take(8);
+                          },
+                          onSelected: (disponible) {
+                            _addItemForDisponible(disponible);
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                          fieldViewBuilder:
+                              (context, controller, focusNode, onSubmit) {
+                            return TextField(
+                              controller: controller,
+                              focusNode: focusNode,
+                              decoration: _itemDecoration(
+                                context,
+                                'Buscar producto',
+                              ).copyWith(
+                                prefixIcon: const Icon(Icons.search),
+                              ),
+                              textInputAction: TextInputAction.search,
+                              onChanged: (value) {
+                                setState(() {
+                                  _searchQuery = value;
+                                });
+                              },
+                              onSubmitted: (_) => onSubmit(),
+                            );
+                          },
+                          optionsViewBuilder:
+                              (context, onSelected, options) {
+                            final theme = Theme.of(context);
+                            return Align(
+                              alignment: Alignment.topLeft,
+                              child: SizedBox(
+                                width: 320,
+                                child: Material(
+                                  elevation: 6,
+                                  color: theme.colorScheme.surface,
+                                  borderRadius:
+                                      const BorderRadius.all(Radius.circular(10)),
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxHeight: 260,
+                                    ),
+                                    child: ListView.separated(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      shrinkWrap: true,
+                                      itemCount: options.length,
+                                      separatorBuilder: (_, __) => Divider(
+                                        height: 1,
+                                        color: theme.dividerColor.withAlpha(90),
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        final disponible = options.elementAt(index);
+                                        return InkWell(
+                                          onTap: () => onSelected(disponible),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 10,
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '${disponible.codigo} - ${disponible.descripcion}',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: theme
+                                                      .textTheme.bodyMedium,
+                                                ),
+                                                Text(
+                                                  'Disponible: ${_formatStock(disponible.stockDisponible)}',
+                                                  style: theme
+                                                      .textTheme.labelSmall
+                                                      ?.copyWith(
+                                                    color: theme
+                                                        .colorScheme.onSurface
+                                                        .withAlpha(150),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: 260,
+                        child: TextField(
+                          controller: _codigoController,
+                          focusNode: _codigoFocus,
+                          textInputAction: TextInputAction.done,
+                          decoration: _itemDecoration(
+                            context,
+                            'Codigo o barras',
+                          ).copyWith(
+                            prefixIcon: const Icon(Icons.qr_code_2),
+                            suffixIcon: IconButton(
+                              onPressed: () =>
+                                  _handleCodigoSubmit(_codigoController.text),
+                              icon: const Icon(Icons.add),
+                              tooltip: 'Agregar',
+                            ),
+                          ),
+                          onSubmitted: _handleCodigoSubmit,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: defaultPadding / 2),
                   Column(
                     children: List.generate(items.length, (index) {
                       final item = items[index];
+                      final dropdownProductos =
+                          _withSelectedProducto(filteredProductos, item.productoId);
                       final producto = productos.firstWhere(
                         (producto) => producto.id == item.productoId,
                         orElse: () => Producto(
@@ -1791,6 +2518,48 @@ class _FacturaItemsCard extends StatelessWidget {
                           activo: true,
                         ),
                       );
+                      final effectiveBodegaId =
+                          item.bodegaId ?? widget.defaultBodegaId;
+                      final dropdownBodegaId = availableBodegas.any(
+                        (bodega) => bodega.id == effectiveBodegaId,
+                      )
+                          ? effectiveBodegaId
+                          : null;
+                      final bodegaMissing =
+                          item.productoId != null && dropdownBodegaId == null;
+                      final disponible = _lookupDisponible(
+                        item.productoId,
+                        dropdownBodegaId,
+                      );
+                      final key = (item.productoId != null &&
+                              dropdownBodegaId != null)
+                          ? _keyFor(item.productoId!, dropdownBodegaId!)
+                          : null;
+                      final requiredQty =
+                          key == null ? 0 : (requiredByKey[key] ?? 0);
+                      final remaining = disponible == null
+                          ? null
+                          : disponible.stockDisponible - requiredQty;
+                      final missingInDefault = key != null &&
+                          loadedForDefault &&
+                          dropdownBodegaId == widget.defaultBodegaId &&
+                          disponible == null;
+                      final sinStock = (key != null &&
+                              _sinStockKeys.contains(key)) ||
+                          missingInDefault;
+                      final stockInsuficiente = item.productoId != null &&
+                          !bodegaMissing &&
+                          (sinStock || (remaining != null && remaining < 0));
+                      final stockLabel = bodegaMissing
+                          ? 'Sin bodega'
+                          : sinStock
+                              ? 'Sin stock'
+                              : remaining == null
+                                  ? '-'
+                                  : _formatStock(remaining);
+                      final stockColor = (bodegaMissing || stockInsuficiente)
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onSurface.withAlpha(200);
                       final base = producto.precioUnitario * item.cantidad;
                       final ivaMonto =
                           (base - item.descuento) * (impuesto.tarifa / 100);
@@ -1799,29 +2568,85 @@ class _FacturaItemsCard extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: defaultPadding / 2),
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                              color: (stockInsuficiente || bodegaMissing)
+                                  ? theme.colorScheme.error.withAlpha(18)
+                                  : Colors.transparent,
+                              borderRadius:
+                                  const BorderRadius.all(Radius.circular(8)),
+                            ),
+                            child: Row(
+                              children: [
                               SizedBox(
                                 width: 320,
                                 child: DropdownButtonFormField<int>(
+                                  isExpanded: true,
                                   value: item.productoId,
-                                  items: productos
+                                  items: dropdownProductos
                                       .map(
                                         (producto) => DropdownMenuItem(
                                           value: producto.id,
-                                          child: Text(
-                                            '${producto.codigo} - ${producto.descripcion}',
+                                          child: SizedBox(
+                                            width: 260,
+                                            child: Text(
+                                              producto.descripcion,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
                                         ),
                                       )
                                       .toList(),
                                   onChanged: (value) {
                                     item.productoId = value;
-                                    onChanged();
+                                    widget.onChanged();
+                                    final bodegaId =
+                                        item.bodegaId ?? widget.defaultBodegaId;
+                                    if (value != null && bodegaId != null) {
+                                      _ensureDisponibleDetalle(
+                                        productoId: value,
+                                        bodegaId: bodegaId,
+                                      );
+                                    }
                                   },
                                   decoration: _itemDecoration(
                                     context,
                                     'Producto',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: defaultPadding / 2),
+                              SizedBox(
+                                width: 200,
+                                child: DropdownButtonFormField<int>(
+                                  value: dropdownBodegaId,
+                                  items: availableBodegas
+                                      .map(
+                                        (bodega) => DropdownMenuItem(
+                                          value: bodega.id,
+                                          child: Text(bodega.nombre),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: availableBodegas.isEmpty
+                                      ? null
+                                      : (value) {
+                                          item.bodegaId = value;
+                                          widget.onChanged();
+                                          final productoId = item.productoId;
+                                          if (value != null &&
+                                              productoId != null) {
+                                            _ensureDisponibleDetalle(
+                                              productoId: productoId,
+                                              bodegaId: value,
+                                            );
+                                          }
+                                        },
+                                  decoration: _itemDecoration(
+                                    context,
+                                    'Bodega',
                                   ),
                                 ),
                               ),
@@ -1835,8 +2660,22 @@ class _FacturaItemsCard extends StatelessWidget {
                                   keyboardType: TextInputType.number,
                                   onChanged: (value) {
                                     item.cantidad = int.tryParse(value) ?? 0;
-                                    onChanged();
+                                    widget.onChanged();
                                   },
+                                ),
+                              ),
+                              const SizedBox(width: defaultPadding / 2),
+                              SizedBox(
+                                width: 110,
+                                child: InputDecorator(
+                                  decoration:
+                                      _itemDecoration(context, 'Existencia'),
+                                  child: Text(
+                                    stockLabel,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: stockColor,
+                                    ),
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: defaultPadding / 2),
@@ -1851,7 +2690,7 @@ class _FacturaItemsCard extends StatelessWidget {
                                   onChanged: (value) {
                                     item.descuento =
                                         double.tryParse(value) ?? 0;
-                                    onChanged();
+                                    widget.onChanged();
                                   },
                                 ),
                               ),
@@ -1899,14 +2738,15 @@ class _FacturaItemsCard extends StatelessWidget {
                                     return;
                                   }
                                   items.removeAt(index);
-                                  onChanged();
+                                  widget.onChanged();
                                 },
                                 icon: const Icon(Icons.delete_outline),
                               ),
                             ],
                           ),
                         ),
-                      );
+                      ),
+                    );
                     }),
                   ),
                 ],
@@ -2718,6 +3558,8 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
     switch (estado.toUpperCase()) {
       case 'AUTORIZADA':
         return Colors.green;
+      case 'NO_AUTORIZADA':
+        return Colors.amber.shade700;
       case 'ENVIADA':
         return Colors.blue;
       case 'ERROR':
@@ -2927,9 +3769,11 @@ class _FacturaItemDraft {
     required this.cantidad,
     required this.descuento,
     this.productoId,
+    this.bodegaId,
   });
 
   int? productoId;
+  int? bodegaId;
   int cantidad;
   double descuento;
 }

@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-enum FacturaNoticeVariant { processing, success, error, info }
+enum FacturaNoticeVariant { processing, success, warning, error, info }
 
 class FacturaNoticeAction {
   const FacturaNoticeAction({
@@ -93,6 +93,7 @@ class _FacturaNoticeCard extends StatelessWidget {
     final accent = _accentColor(theme, variant);
     final surface = theme.colorScheme.surface;
     final titleColor = (variant == FacturaNoticeVariant.success ||
+            variant == FacturaNoticeVariant.warning ||
             variant == FacturaNoticeVariant.error)
         ? accent
         : theme.colorScheme.onSurface;
@@ -256,6 +257,8 @@ class _FacturaNoticeCard extends StatelessWidget {
     switch (variant) {
       case FacturaNoticeVariant.success:
         return Colors.green;
+      case FacturaNoticeVariant.warning:
+        return Colors.amber.shade700;
       case FacturaNoticeVariant.error:
         return theme.colorScheme.error;
       case FacturaNoticeVariant.processing:
@@ -307,6 +310,8 @@ class _LeadingIcon extends StatelessWidget {
         );
       case FacturaNoticeVariant.success:
         return Icon(Icons.check_circle, color: accent, size: 30);
+      case FacturaNoticeVariant.warning:
+        return Icon(Icons.warning_amber_rounded, color: accent, size: 30);
       case FacturaNoticeVariant.error:
         return Icon(Icons.error_rounded, color: accent, size: 30);
       case FacturaNoticeVariant.info:

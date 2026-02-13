@@ -33,8 +33,12 @@ class ApiClient {
     return _process(response);
   }
 
-  Future<dynamic> post(String path, {Map<String, dynamic>? body}) async {
-    final uri = _buildUri(path);
+  Future<dynamic> post(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? query,
+  }) async {
+    final uri = _buildUri(path, query);
     final response = await _client.post(
       uri,
       headers: _jsonHeaders(),
@@ -53,14 +57,25 @@ class ApiClient {
     return _process(response);
   }
 
+  Future<dynamic> delete(String path, {Map<String, dynamic>? body}) async {
+    final uri = _buildUri(path);
+    final response = await _client.delete(
+      uri,
+      headers: body == null ? _simpleHeaders() : _jsonHeaders(),
+      body: body == null ? null : jsonEncode(body),
+    );
+    return _process(response);
+  }
+
   Future<dynamic> postMultipart(
     String path, {
     required List<int> bytes,
     required String filename,
     required Map<String, String> fields,
     String? contentType,
+    Map<String, String>? query,
   }) async {
-    final uri = _buildUri(path);
+    final uri = _buildUri(path, query);
     final request = http.MultipartRequest('POST', uri);
     request.headers.addAll(_simpleHeaders());
     request.fields.addAll(fields);

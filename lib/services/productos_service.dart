@@ -13,6 +13,18 @@ class ProductosService {
     return items.map(Producto.fromJson).toList();
   }
 
+  Future<Producto> fetchProductoByCodigo(String codigo) async {
+    final response = await _client.get(
+      '/api/productos/buscar',
+      query: {'codigo': codigo},
+    );
+    final map = extractMap(response);
+    if (map.isEmpty) {
+      throw ApiException('Producto no encontrado.', statusCode: 404);
+    }
+    return Producto.fromJson(map);
+  }
+
   Future<Producto> createProducto(Producto producto) async {
     final response = await _client.post(
       '/api/productos',
