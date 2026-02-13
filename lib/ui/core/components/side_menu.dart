@@ -82,25 +82,22 @@ class _SideMenuHeader extends StatelessWidget {
                 ),
                 if (!isCollapsed) ...[
                   const SizedBox(width: 10),
-                  Text(
+                  /* Text(
                     "Inicio",
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
-                  ),
+                  ), */
                 ],
               ],
             ),
           ),
           if (Responsive.isDesktop(context))
             IconButton(
-              tooltip:
-                  isCollapsed ? 'Expandir menu' : 'Contraer menu',
+              tooltip: isCollapsed ? 'Expandir menu' : 'Contraer menu',
               onPressed: controller.toggleMenuCollapsed,
               icon: Icon(
-                isCollapsed
-                    ? Icons.chevron_right
-                    : Icons.chevron_left,
+                isCollapsed ? Icons.chevron_right : Icons.chevron_left,
               ),
             ),
         ],
@@ -134,8 +131,7 @@ class DrawerListTile extends StatelessWidget {
     final tile = ListTile(
       onTap: press,
       horizontalTitleGap: isCollapsed ? 0.0 : 12.0,
-      contentPadding:
-          EdgeInsets.symmetric(horizontal: isCollapsed ? 14 : 16),
+      contentPadding: EdgeInsets.symmetric(horizontal: isCollapsed ? 14 : 16),
       selected: selected,
       selectedTileColor: theme.colorScheme.primary.withAlpha(26),
       leading: SvgPicture.asset(

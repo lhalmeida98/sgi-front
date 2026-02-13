@@ -41,13 +41,37 @@ class ProductosService {
     if (producto.id == null) {
       throw ApiException('Producto sin ID para actualizar.');
     }
+    final payload = {
+      'codigo': producto.codigo,
+      'descripcion': producto.descripcion,
+      'precioUnitario': producto.precioUnitario,
+      'categoriaId': producto.categoriaId,
+      'impuestoId': producto.impuestoId,
+      'vendible': producto.vendible,
+      'codigoBarras': producto.codigoBarras ?? '',
+    };
     final response = await _client.put(
       '/api/productos/${producto.id}',
-      body: producto.toJson(),
+      body: payload,
     );
     final map = extractMap(response);
     if (map.isEmpty) {
       return producto;
+    }
+    return Producto.fromJson(map);
+  }
+
+  Future<Producto?> updateVendible({
+    required int productoId,
+    required bool vendible,
+  }) async {
+    final response = await _client.put(
+      '/api/productos/$productoId/vendible',
+      body: {'vendible': vendible},
+    );
+    final map = extractMap(response);
+    if (map.isEmpty) {
+      return null;
     }
     return Producto.fromJson(map);
   }

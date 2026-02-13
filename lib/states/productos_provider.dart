@@ -49,6 +49,36 @@ class ProductosProvider extends BaseProvider {
     }
   }
 
+  Future<bool> updateVendible({
+    required int productoId,
+    required bool vendible,
+  }) async {
+    setLoading(true);
+    try {
+      final updated = await _service.updateVendible(
+        productoId: productoId,
+        vendible: vendible,
+      );
+      if (updated != null) {
+        upsertProductoLocal(updated);
+      } else {
+        final index = productos.indexWhere((item) => item.id == productoId);
+        if (index >= 0) {
+          productos[index] =
+              productos[index].copyWith(vendible: vendible);
+          notifyListeners();
+        }
+      }
+      setError(null);
+      return true;
+    } catch (error) {
+      setError(resolveError(error));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   Future<Producto?> fetchProductoByCodigo(String codigo) async {
     try {
       final producto = await _service.fetchProductoByCodigo(codigo);

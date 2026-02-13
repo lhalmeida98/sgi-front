@@ -180,6 +180,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                         producto.empresaId == empresaId,
                   )
                   .toList();
+          final productosVendibles =
+              productos.where((producto) => producto.vendible).toList();
           final impuestos = empresaId == null
               ? impuestosProvider.impuestos
               : impuestosProvider.impuestos
@@ -199,6 +201,13 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                   .toList();
           final productosDisponibles =
               inventariosProvider.productosDisponibles;
+          final vendibleIds = productosVendibles
+              .where((producto) => producto.id != null)
+              .map((producto) => producto.id!)
+              .toSet();
+          final productosDisponiblesVendibles = productosDisponibles
+              .where((disponible) => vendibleIds.contains(disponible.productoId))
+              .toList();
           final disponiblesBodegaId =
               inventariosProvider.productosDisponiblesBodegaId;
           final isLoading = empresasProvider.isLoading ||
@@ -319,9 +328,10 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                       empresas: empresas,
                       clientes: clientes,
                       productos: productos,
+                      productosVendibles: productosVendibles,
                       impuestos: impuestos,
                       bodegas: bodegas,
-                      disponibles: productosDisponibles,
+                      disponibles: productosDisponiblesVendibles,
                       disponiblesBodegaId: disponiblesBodegaId,
                       canSelectEmpresa: authProvider.isAdmin,
                       empresaId: _empresaId,
@@ -1421,6 +1431,7 @@ class _FacturarView extends StatelessWidget {
     required this.empresas,
     required this.clientes,
     required this.productos,
+    required this.productosVendibles,
     required this.impuestos,
     required this.bodegas,
     required this.disponibles,
@@ -1452,6 +1463,7 @@ class _FacturarView extends StatelessWidget {
   final List<Empresa> empresas;
   final List<Cliente> clientes;
   final List<Producto> productos;
+  final List<Producto> productosVendibles;
   final List<Impuesto> impuestos;
   final List<Bodega> bodegas;
   final List<InventarioProductoDisponible> disponibles;
@@ -1616,6 +1628,7 @@ class _FacturarView extends StatelessWidget {
         _FacturaItemsCard(
           items: items,
           productos: productos,
+          productosVendibles: productosVendibles,
           impuestos: impuestos,
           bodegas: bodegas,
           disponibles: disponibles,
@@ -2066,6 +2079,7 @@ class _FacturaItemsCard extends StatefulWidget {
   const _FacturaItemsCard({
     required this.items,
     required this.productos,
+    required this.productosVendibles,
     required this.impuestos,
     required this.bodegas,
     required this.disponibles,
@@ -2076,6 +2090,7 @@ class _FacturaItemsCard extends StatefulWidget {
 
   final List<_FacturaItemDraft> items;
   final List<Producto> productos;
+  final List<Producto> productosVendibles;
   final List<Impuesto> impuestos;
   final List<Bodega> bodegas;
   final List<InventarioProductoDisponible> disponibles;
@@ -2118,6 +2133,14 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
   }
 
   void _addItemForDisponible(InventarioProductoDisponible disponible) {
+    final isVendible = widget.productosVendibles
+        .any((producto) => producto.id == disponible.productoId);
+    if (!isVendible) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Producto no vendible.')),
+      );
+      return;
+    }
     final producto = Producto(
       id: disponible.productoId,
       codigo: disponible.codigo,
@@ -2250,6 +2273,7 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
   List<Producto> _withSelectedProducto(
     List<Producto> productos,
     int? selectedId,
+    List<Producto> fallback,
   ) {
     if (selectedId == null) {
       return productos;
@@ -2258,7 +2282,7 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
     if (hasSelected) {
       return productos;
     }
-    final selected = widget.productos
+    final selected = fallback
         .cast<Producto?>()
         .firstWhere((producto) => producto?.id == selectedId, orElse: () => null);
     if (selected == null) {
@@ -2297,13 +2321,15 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
   Widget build(BuildContext context) {
     final items = widget.items;
     final productos = widget.productos;
+    final productosVendibles = widget.productosVendibles;
     final impuestos = widget.impuestos;
     final theme = Theme.of(context);
     final availableBodegas =
         widget.bodegas.where((bodega) => bodega.id != null).toList();
     final loadedForDefault = widget.defaultBodegaId != null &&
         widget.disponiblesBodegaId == widget.defaultBodegaId;
-    final filteredProductos = _filterProductos(productos, _searchQuery);
+    final filteredProductos =
+        _filterProductos(productosVendibles, _searchQuery);
     final requiredByKey = <String, double>{};
     for (final item in items) {
       final productoId = item.productoId;
@@ -2494,8 +2520,11 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
                   Column(
                     children: List.generate(items.length, (index) {
                       final item = items[index];
-                      final dropdownProductos =
-                          _withSelectedProducto(filteredProductos, item.productoId);
+                      final dropdownProductos = _withSelectedProducto(
+                        filteredProductos,
+                        item.productoId,
+                        productos,
+                      );
                       final producto = productos.firstWhere(
                         (producto) => producto.id == item.productoId,
                         orElse: () => Producto(

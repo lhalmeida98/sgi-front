@@ -12,6 +12,7 @@ class Producto {
     required this.impuestoId,
     this.categoriaNombre,
     this.impuestoDescripcion,
+    this.vendible = true,
   });
 
   final int? id;
@@ -24,6 +25,7 @@ class Producto {
   final int impuestoId;
   final String? categoriaNombre;
   final String? impuestoDescripcion;
+  final bool vendible;
 
   factory Producto.fromJson(Map<String, dynamic> json) {
     return Producto(
@@ -39,6 +41,7 @@ class Producto {
           json['categoria']?['nombre']?.toString(),
       impuestoDescripcion: json['impuestoDescripcion']?.toString() ??
           json['impuesto']?['descripcion']?.toString(),
+      vendible: parseBool(json['vendible']) ?? true,
     );
   }
 
@@ -52,6 +55,35 @@ class Producto {
       'precioUnitario': precioUnitario,
       'categoriaId': categoriaId,
       'impuestoId': impuestoId,
+      'vendible': vendible,
     };
+  }
+
+  Producto copyWith({
+    int? id,
+    int? empresaId,
+    String? codigo,
+    String? codigoBarras,
+    String? descripcion,
+    double? precioUnitario,
+    int? categoriaId,
+    int? impuestoId,
+    String? categoriaNombre,
+    String? impuestoDescripcion,
+    bool? vendible,
+  }) {
+    return Producto(
+      id: id ?? this.id,
+      empresaId: empresaId ?? this.empresaId,
+      codigo: codigo ?? this.codigo,
+      codigoBarras: codigoBarras ?? this.codigoBarras,
+      descripcion: descripcion ?? this.descripcion,
+      precioUnitario: precioUnitario ?? this.precioUnitario,
+      categoriaId: categoriaId ?? this.categoriaId,
+      impuestoId: impuestoId ?? this.impuestoId,
+      categoriaNombre: categoriaNombre ?? this.categoriaNombre,
+      impuestoDescripcion: impuestoDescripcion ?? this.impuestoDescripcion,
+      vendible: vendible ?? this.vendible,
+    );
   }
 }

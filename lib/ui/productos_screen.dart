@@ -167,12 +167,36 @@ class _ProductosScreenState extends State<ProductosScreen> {
                     productos: productos,
                     categorias: categorias,
                     impuestos: impuestos,
+                    isUpdating: productosProvider.isLoading,
                     onEdit: (producto) => _openProductoDialog(
                       context,
                       producto: producto,
                       categorias: categorias,
                       impuestos: impuestos,
                     ),
+                    onToggleVendible: (producto, value) async {
+                      final productoId = producto.id;
+                      if (productoId == null) {
+                        showAppToast(
+                          context,
+                          'Producto sin ID para actualizar.',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      final ok = await productosProvider.updateVendible(
+                        productoId: productoId,
+                        vendible: value,
+                      );
+                      if (!ok && context.mounted) {
+                        showAppToast(
+                          context,
+                          productosProvider.errorMessage ??
+                              'No se pudo actualizar el producto.',
+                          isError: true,
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
@@ -217,6 +241,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
     );
     int? categoriaId = producto?.categoriaId;
     int? impuestoId = producto?.impuestoId;
+    bool vendible = producto?.vendible ?? true;
 
     await showDialog<void>(
       context: providerContext,
@@ -324,6 +349,15 @@ class _ProductosScreenState extends State<ProductosScreen> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: defaultPadding / 2),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Vendible'),
+                        value: vendible,
+                        onChanged: (value) {
+                          setState(() => vendible = value);
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -351,6 +385,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                       double.tryParse(precioController.text.trim()) ?? 0,
                   categoriaId: categoriaId!,
                   impuestoId: impuestoId!,
+                  vendible: vendible,
                 );
                 final ok = isEditing
                     ? await provider.updateProducto(payload)
@@ -393,13 +428,17 @@ class _ProductosList extends StatelessWidget {
     required this.productos,
     required this.categorias,
     required this.impuestos,
+    required this.isUpdating,
     required this.onEdit,
+    required this.onToggleVendible,
   });
 
   final List<Producto> productos;
   final List<Categoria> categorias;
   final List<Impuesto> impuestos;
+  final bool isUpdating;
   final void Function(Producto producto) onEdit;
+  final void Function(Producto producto, bool value) onToggleVendible;
 
   String _categoriaNombre(int categoriaId) {
     return categorias
@@ -448,10 +487,21 @@ class _ProductosList extends StatelessWidget {
                   subtitle: Text(
                     'Precio: ${producto.precioUnitario.toStringAsFixed(2)} | ${_categoriaNombre(producto.categoriaId)}${producto.codigoBarras == null || producto.codigoBarras!.isEmpty ? '' : ' | Barra: ${producto.codigoBarras}'}',
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.edit_outlined),
-                    tooltip: 'Editar',
-                    onPressed: () => onEdit(producto),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Switch.adaptive(
+                        value: producto.vendible,
+                        onChanged: isUpdating
+                            ? null
+                            : (value) => onToggleVendible(producto, value),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: 'Editar',
+                        onPressed: () => onEdit(producto),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -484,6 +534,7 @@ class _ProductosList extends StatelessWidget {
                     DataColumn(label: Text('Precio')),
                     DataColumn(label: Text('Categoria')),
                     DataColumn(label: Text('Impuesto')),
+                    DataColumn(label: Text('Vendible')),
                     DataColumn(label: Text('Acciones')),
                   ],
                   rows: productos
@@ -501,6 +552,15 @@ class _ProductosList extends StatelessWidget {
                             ),
                             DataCell(
                               Text(_impuestoNombre(producto.impuestoId)),
+                            ),
+                            DataCell(
+                              Switch.adaptive(
+                                value: producto.vendible,
+                                onChanged: isUpdating
+                                    ? null
+                                    : (value) =>
+                                        onToggleVendible(producto, value),
+                              ),
                             ),
                             DataCell(
                               IconButton(
