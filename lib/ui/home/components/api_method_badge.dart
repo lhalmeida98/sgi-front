@@ -27,7 +27,7 @@ class ApiMethodBadge extends StatelessWidget {
         border: Border.all(color: color.withAlpha(80)),
       ),
       child: Text(
-        method == ApiMethod.get ? "GET" : "POST",
+        _methodLabel(method),
         style: textStyle?.copyWith(
           color: color,
           fontWeight: FontWeight.w600,
@@ -43,6 +43,19 @@ class ApiMethodBadge extends StatelessWidget {
         return const Color(0xFF2E7D32);
       case ApiMethod.post:
         return const Color(0xFFF57C00);
+      case ApiMethod.patch:
+        return const Color(0xFF1976D2);
+    }
+  }
+
+  String _methodLabel(ApiMethod method) {
+    switch (method) {
+      case ApiMethod.get:
+        return 'GET';
+      case ApiMethod.post:
+        return 'POST';
+      case ApiMethod.patch:
+        return 'PATCH';
     }
   }
 }

@@ -11,6 +11,7 @@ enum AppSection {
   impuestos,
   productos,
   clientes,
+  cxc,
   proveedores,
   inventarios,
   bodegas,
@@ -136,6 +137,15 @@ const List<AppSectionItem> appSections = [
     color: Color(0xFF6FCF97),
     codigo: 'clientes',
     tipo: 'Catalogos',
+  ),
+  AppSectionItem(
+    section: AppSection.cxc,
+    title: 'CxC',
+    icon: 'assets/icons/menu_doc.svg',
+    description: 'Cuentas por cobrar y cobros de clientes.',
+    color: Color(0xFF2F80ED),
+    codigo: 'cxc',
+    tipo: 'Operaciones',
   ),
   AppSectionItem(
     section: AppSection.proveedores,

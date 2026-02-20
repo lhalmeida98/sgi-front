@@ -12,6 +12,7 @@ class Empresa {
     required this.estab,
     required this.ptoEmi,
     required this.secuencial,
+    this.creditoDiasDefault,
   });
 
   final int? id;
@@ -24,6 +25,7 @@ class Empresa {
   final String estab;
   final String ptoEmi;
   final String secuencial;
+  final int? creditoDiasDefault;
 
   factory Empresa.fromJson(Map<String, dynamic> json) {
     return Empresa(
@@ -37,6 +39,8 @@ class Empresa {
       estab: (json['estab'] ?? '').toString(),
       ptoEmi: (json['ptoEmi'] ?? '').toString(),
       secuencial: (json['secuencial'] ?? '').toString(),
+      creditoDiasDefault:
+          parseInt(json['creditoDiasDefault'] ?? json['creditoDias']),
     );
   }
 
@@ -52,6 +56,8 @@ class Empresa {
       'estab': estab,
       'ptoEmi': ptoEmi,
       'secuencial': secuencial,
+      if (creditoDiasDefault != null)
+        'creditoDiasDefault': creditoDiasDefault,
     };
   }
 }

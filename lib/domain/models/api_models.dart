@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum ApiMethod { get, post }
+enum ApiMethod { get, post, patch }
 
 class ApiEndpoint {
   const ApiEndpoint({

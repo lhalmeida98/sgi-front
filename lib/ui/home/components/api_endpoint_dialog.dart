@@ -14,10 +14,10 @@ void showApiEndpointDialog({
     builder: (context) {
       final theme = Theme.of(context);
       final payloadText = endpoint.payload?.trim();
+      final usesBody = endpoint.method == ApiMethod.post ||
+          endpoint.method == ApiMethod.patch;
       final contentType = endpoint.contentType ??
-          ((endpoint.method == ApiMethod.post && endpoint.hasPayload)
-              ? "application/json"
-              : "N/A");
+          ((usesBody && endpoint.hasPayload) ? "application/json" : "N/A");
       return AlertDialog(
         title: Text(endpoint.title),
         content: SizedBox(

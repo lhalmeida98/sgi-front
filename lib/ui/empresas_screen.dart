@@ -198,6 +198,9 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
     final ptoEmiController = TextEditingController(text: empresa?.ptoEmi ?? '');
     final secuencialController =
         TextEditingController(text: empresa?.secuencial ?? '');
+    final creditoDiasController = TextEditingController(
+      text: empresa?.creditoDiasDefault?.toString() ?? '',
+    );
 
     var ambiente = empresa?.ambiente ?? 'PRUEBAS';
     var tipoEmision = empresa?.tipoEmision ?? 'NORMAL';
@@ -358,6 +361,25 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                             return null;
                           },
                         ),
+                        const SizedBox(height: defaultPadding / 2),
+                        TextFormField(
+                          controller: creditoDiasController,
+                          decoration: const InputDecoration(
+                            labelText: 'Credito default (dias)',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            final trimmed = value?.trim() ?? '';
+                            if (trimmed.isEmpty) {
+                              return null;
+                            }
+                            final parsed = int.tryParse(trimmed);
+                            if (parsed == null || parsed < 0) {
+                              return 'Debe ser un numero valido';
+                            }
+                            return null;
+                          },
+                        ),
                         const SizedBox(height: defaultPadding),
                         Container(
                           padding: const EdgeInsets.all(defaultPadding),
@@ -445,6 +467,8 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                 }
                 final provider =
                     providerContext.read<EmpresasProvider>();
+                final creditoDiasValue =
+                    int.tryParse(creditoDiasController.text.trim());
                 final payload = Empresa(
                   id: empresa?.id,
                   ambiente: ambiente,
@@ -456,6 +480,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                   estab: estabController.text.trim(),
                   ptoEmi: ptoEmiController.text.trim(),
                   secuencial: secuencialController.text.trim(),
+                  creditoDiasDefault: creditoDiasValue,
                 );
 
                 if (isEditing) {
@@ -539,6 +564,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
     estabController.dispose();
     ptoEmiController.dispose();
     secuencialController.dispose();
+    creditoDiasController.dispose();
     claveController.dispose();
   }
 
@@ -786,7 +812,9 @@ class _EmpresasList extends StatelessWidget {
               (empresa) => Card(
                 child: ListTile(
                   title: Text(empresa.razonSocial),
-                  subtitle: Text('RUC: ${empresa.ruc}'),
+                  subtitle: Text(
+                    'RUC: ${empresa.ruc} • Credito ${empresa.creditoDiasDefault?.toString() ?? '-'} dias',
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -883,6 +911,7 @@ class _EmpresasList extends StatelessWidget {
                         DataColumn(label: Text('Razon social')),
                         DataColumn(label: Text('Ambiente')),
                         DataColumn(label: Text('Estab/PtoEmi')),
+                        DataColumn(label: Text('Credito default')),
                         DataColumn(label: Text('Acciones')),
                       ],
                       rows: items
@@ -895,6 +924,12 @@ class _EmpresasList extends StatelessWidget {
                                   _AmbienteBadge(ambiente: empresa.ambiente),
                                 ),
                                 DataCell(Text('${empresa.estab}-${empresa.ptoEmi}')),
+                                DataCell(
+                                  Text(
+                                    empresa.creditoDiasDefault?.toString() ??
+                                        '-',
+                                  ),
+                                ),
                                 DataCell(
                                   Row(
                                     mainAxisSize: MainAxisSize.min,

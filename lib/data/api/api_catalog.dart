@@ -61,7 +61,8 @@ final List<ApiModule> apiModules = [
   "identificacion": "0923456789",
   "razonSocial": "Juan Perez",
   "email": "juan@example.com",
-  "direccion": "Av. Siempre Viva 123"
+  "direccion": "Av. Siempre Viva 123",
+  "creditoDias": 30
 }
 ''',
       ),
@@ -116,7 +117,8 @@ final List<ApiModule> apiModules = [
   "dirMatriz": "Av. Principal 100",
   "estab": "001",
   "ptoEmi": "002",
-  "secuencial": "000000123"
+  "secuencial": "000000123",
+  "creditoDiasDefault": 30
 }
 ''',
       ),
@@ -295,6 +297,83 @@ archivo: (file) logo.png
         title: "Reenviar facturas",
         description: "Reintenta envio de facturas en proceso.",
         actionLabel: "Reenviar",
+      ),
+    ],
+  ),
+  ApiModule(
+    title: "CxC",
+    description: "Cuentas por cobrar y cobros de clientes.",
+    icon: "assets/icons/menu_doc.svg",
+    color: Color(0xFF2F80ED),
+    endpoints: const [
+      ApiEndpoint(
+        method: ApiMethod.get,
+        path: "/api/documentos-cliente",
+        title: "Listar documentos cliente",
+        description: "Obtiene documentos (opcional filtro por cliente).",
+        actionLabel: "Listar",
+      ),
+      ApiEndpoint(
+        method: ApiMethod.get,
+        path: "/api/clientes/{clienteId}/documentos",
+        title: "Documentos por cliente",
+        description: "Lista documentos filtrados por cliente.",
+        actionLabel: "Listar",
+      ),
+      ApiEndpoint(
+        method: ApiMethod.patch,
+        path: "/api/documentos-cliente/{documentoId}/estado",
+        title: "Anular documento",
+        description: "Actualiza estado de DocumentoCliente.",
+        actionLabel: "Actualizar",
+        payload: '''
+{
+  "estado": "ANULADA",
+  "motivo": "Error de emision"
+}
+''',
+      ),
+      ApiEndpoint(
+        method: ApiMethod.get,
+        path: "/api/cxc",
+        title: "Listar cuentas por cobrar",
+        description: "Obtiene CxC (opcional filtro por cliente).",
+        actionLabel: "Listar",
+      ),
+      ApiEndpoint(
+        method: ApiMethod.post,
+        path: "/api/cobros-cliente",
+        title: "Registrar cobro",
+        description: "Registra un cobro aplicable a varias CxC.",
+        actionLabel: "Registrar",
+        payload: '''
+{
+  "clienteId": 10,
+  "fecha": "2026-02-20",
+  "formaPago": "TRANSFERENCIA",
+  "referencia": "TRX-8899",
+  "montoTotal": 150.00,
+  "observacion": "Pago parcial",
+  "detalles": [
+    { "cuentaPorCobrarId": 1, "montoAplicado": 100.00 },
+    { "cuentaPorCobrarId": 2, "montoAplicado": 50.00 }
+  ]
+}
+''',
+      ),
+      ApiEndpoint(
+        method: ApiMethod.get,
+        path: "/api/cobros-cliente",
+        title: "Listar cobros cliente",
+        description: "Obtiene cobros (opcional filtro por cliente).",
+        actionLabel: "Listar",
+      ),
+      ApiEndpoint(
+        method: ApiMethod.get,
+        path: "/api/reportes/cxc/aging",
+        title: "Reporte aging CxC",
+        description: "Resumen de vencidas y por vencer.",
+        actionLabel: "Listar",
       ),
     ],
   ),

@@ -593,6 +593,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         razonSocial: cliente.razonSocial,
         email: _clienteEmailController.text.trim(),
         direccion: _clienteDireccionController.text.trim(),
+        creditoDias: cliente.creditoDias,
       );
       final ok = await _clientesProvider.updateCliente(updated);
       if (!ok) {
@@ -1993,6 +1994,26 @@ class _PagoResumenCard extends StatelessWidget {
                                   DropdownMenuItem(
                                     value: 'EFECTIVO',
                                     child: Text('Efectivo'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'CREDITO',
+                                    child: Text('Credito (default)'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'CREDITO 30',
+                                    child: Text('Credito 30 dias'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'CREDITO 60',
+                                    child: Text('Credito 60 dias'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'CREDITO 90',
+                                    child: Text('Credito 90 dias'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'CREDITO 120',
+                                    child: Text('Credito +90 dias'),
                                   ),
                                   DropdownMenuItem(
                                     value: 'TARJETA',

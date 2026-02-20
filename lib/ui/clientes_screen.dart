@@ -124,6 +124,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
     final emailController = TextEditingController(text: cliente?.email ?? '');
     final direccionController =
         TextEditingController(text: cliente?.direccion ?? '');
+    final creditoDiasController = TextEditingController(
+      text: cliente?.creditoDias?.toString() ?? '',
+    );
     var tipoIdentificacion = cliente?.tipoIdentificacion ?? '05';
 
     await showDialog<void>(
@@ -202,6 +205,25 @@ class _ClientesScreenState extends State<ClientesScreen> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: creditoDiasController,
+                        decoration: const InputDecoration(
+                          labelText: 'Credito (dias)',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          final trimmed = value?.trim() ?? '';
+                          if (trimmed.isEmpty) {
+                            return null;
+                          }
+                          final parsed = int.tryParse(trimmed);
+                          if (parsed == null || parsed < 0) {
+                            return 'Debe ser un numero valido';
+                          }
+                          return null;
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -218,6 +240,8 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 if (!formKey.currentState!.validate()) {
                   return;
                 }
+                final creditoDiasValue =
+                    int.tryParse(creditoDiasController.text.trim());
                 final provider =
                     providerContext.read<ClientesProvider>();
                 final payload = Cliente(
@@ -227,6 +251,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   razonSocial: razonSocialController.text.trim(),
                   email: emailController.text.trim(),
                   direccion: direccionController.text.trim(),
+                  creditoDias: creditoDiasValue,
                 );
                 final ok = isEditing
                     ? await provider.updateCliente(payload)
@@ -261,6 +286,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
     razonSocialController.dispose();
     emailController.dispose();
     direccionController.dispose();
+    creditoDiasController.dispose();
   }
 
   String? _validateIdentificacion(String? value, String tipo) {
@@ -310,7 +336,9 @@ class _ClientesList extends StatelessWidget {
               (cliente) => Card(
                 child: ListTile(
                   title: Text(cliente.razonSocial),
-                  subtitle: Text(cliente.identificacion),
+                  subtitle: Text(
+                    '${cliente.identificacion} • Credito ${cliente.creditoDias?.toString() ?? '-'} dias',
+                  ),
                   trailing: IconButton(
                     icon: const Icon(Icons.edit_outlined),
                     tooltip: 'Editar',
@@ -346,6 +374,7 @@ class _ClientesList extends StatelessWidget {
                     DataColumn(label: Text('Razon social')),
                     DataColumn(label: Text('Email')),
                     DataColumn(label: Text('Direccion')),
+                    DataColumn(label: Text('Credito (dias)')),
                     DataColumn(label: Text('Acciones')),
                   ],
                   rows: clientes
@@ -357,6 +386,9 @@ class _ClientesList extends StatelessWidget {
                             DataCell(Text(cliente.razonSocial)),
                             DataCell(Text(cliente.email)),
                             DataCell(Text(cliente.direccion)),
+                            DataCell(
+                              Text(cliente.creditoDias?.toString() ?? '-'),
+                            ),
                             DataCell(
                               IconButton(
                                 tooltip: 'Editar',

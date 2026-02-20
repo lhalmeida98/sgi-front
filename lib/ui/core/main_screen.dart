@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../../states/auth_provider.dart';
 import '../../states/menu_app_controller.dart';
 import '../../ui/clientes_screen.dart';
+import '../../ui/cxc_screen.dart';
 import '../../ui/empresas_screen.dart';
 import '../../ui/facturacion_screen.dart';
 import '../../ui/impuestos_screen.dart';
@@ -122,6 +123,8 @@ class _MainShell extends StatelessWidget {
         return const ProductosScreen(key: ValueKey('productos'));
       case AppSection.clientes:
         return const ClientesScreen(key: ValueKey('clientes'));
+      case AppSection.cxc:
+        return const CxcScreen(key: ValueKey('cxc'));
       case AppSection.proveedores:
         return const ProveedoresScreen(key: ValueKey('proveedores'));
       case AppSection.inventarios:
