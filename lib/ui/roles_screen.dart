@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../domain/models/accion.dart';
 import '../domain/models/rol.dart';
 import '../resource/theme/dimens.dart';
+import '../routing/app_sections.dart';
 import '../services/acciones_service.dart';
 import '../services/api_client.dart';
 import '../services/roles_service.dart';
@@ -56,7 +57,7 @@ class _RolesScreenState extends State<RolesScreen> {
       ],
       child: Consumer2<RolesProvider, AccionesProvider>(
         builder: (context, rolesProvider, accionesProvider, _) {
-          if (!authProvider.isAdmin) {
+          if (!authProvider.canAccessSection(AppSection.roles)) {
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(defaultPadding),
@@ -66,7 +67,7 @@ class _RolesScreenState extends State<RolesScreen> {
                     color: Theme.of(context).colorScheme.surface,
                     borderRadius: const BorderRadius.all(Radius.circular(12)),
                   ),
-                  child: const Text('Acceso disponible solo para ADMIN.'),
+                  child: const Text('Acceso no disponible.'),
                 ),
               ),
             );
@@ -125,11 +126,15 @@ class _RolesScreenState extends State<RolesScreen> {
                             if (_section == RolesSection.roles) {
                               _openRolDialog(
                                 context,
+                                rol: null,
                                 accionesDisponibles:
                                     rolesProvider.accionesDisponibles,
                               );
                             } else {
-                              _openAccionDialog(context);
+                              _openAccionDialog(
+                                context,
+                                accion: null,
+                              );
                             }
                           },
                           icon: const Icon(Icons.add),
@@ -140,11 +145,15 @@ class _RolesScreenState extends State<RolesScreen> {
                             if (_section == RolesSection.roles) {
                               _openRolDialog(
                                 context,
+                                rol: null,
                                 accionesDisponibles:
                                     rolesProvider.accionesDisponibles,
                               );
                             } else {
-                              _openAccionDialog(context);
+                              _openAccionDialog(
+                                context,
+                                accion: null,
+                              );
                             }
                           },
                           icon: const Icon(Icons.add),
@@ -175,10 +184,26 @@ class _RolesScreenState extends State<RolesScreen> {
                   if (_section == RolesSection.roles)
                     _RolesList(
                       roles: rolesProvider.roles,
+                      accionesDisponibles:
+                          rolesProvider.accionesDisponibles,
+                      onEdit: (rol) => _openRolDialog(
+                        context,
+                        rol: rol,
+                        accionesDisponibles:
+                            rolesProvider.accionesDisponibles,
+                      ),
+                      onDelete: (rol) =>
+                          _confirmDeleteRol(context, rol),
                     )
                   else
                     _AccionesList(
                       acciones: accionesProvider.acciones,
+                      onEdit: (accion) => _openAccionDialog(
+                        context,
+                        accion: accion,
+                      ),
+                      onDelete: (accion) =>
+                          _confirmDeleteAccion(context, accion),
                     ),
                 ],
               ),
@@ -191,18 +216,40 @@ class _RolesScreenState extends State<RolesScreen> {
 
   Future<void> _openRolDialog(
     BuildContext providerContext, {
+    Rol? rol,
     required List<Accion> accionesDisponibles,
   }) async {
+    final isEditing = rol != null;
     final formKey = GlobalKey<FormState>();
-    final nombreController = TextEditingController();
-    final descripcionController = TextEditingController();
-    final selected = <String>{};
+    final nombreController =
+        TextEditingController(text: rol?.nombre ?? '');
+    final descripcionController =
+        TextEditingController(text: rol?.descripcion ?? '');
+    var activo = rol?.activo ?? true;
+    final selectedIds = <int>{};
+    if (rol != null) {
+      selectedIds.addAll(rol.accionesIds);
+    }
+    if (selectedIds.isEmpty && rol != null && rol.permisos.isNotEmpty) {
+      final permisosSet =
+          rol.permisos.map((item) => item.toUpperCase()).toSet();
+      for (final accion in accionesDisponibles) {
+        if (accion.id == null) {
+          continue;
+        }
+        final codigo = accion.codigo.toUpperCase();
+        final nombre = accion.nombre.toUpperCase();
+        if (permisosSet.contains(codigo) || permisosSet.contains(nombre)) {
+          selectedIds.add(accion.id!);
+        }
+      }
+    }
 
     await showDialog<void>(
       context: providerContext,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Crear rol'),
+          title: Text(isEditing ? 'Editar rol' : 'Crear rol'),
           content: StatefulBuilder(
             builder: (context, setState) {
               return SizedBox(
@@ -247,14 +294,22 @@ class _RolesScreenState extends State<RolesScreen> {
                           children: accionesDisponibles
                               .map(
                                 (accion) => FilterChip(
-                                  label: Text(accion.codigo),
-                                  selected: selected.contains(accion.codigo),
+                                  label: Text(
+                                    accion.nombre.isNotEmpty
+                                        ? accion.nombre
+                                        : accion.codigo,
+                                  ),
+                                  selected: accion.id != null &&
+                                      selectedIds.contains(accion.id),
                                   onSelected: (value) {
                                     setState(() {
+                                      if (accion.id == null) {
+                                        return;
+                                      }
                                       if (value) {
-                                        selected.add(accion.codigo);
+                                        selectedIds.add(accion.id!);
                                       } else {
-                                        selected.remove(accion.codigo);
+                                        selectedIds.remove(accion.id);
                                       }
                                     });
                                   },
@@ -262,6 +317,15 @@ class _RolesScreenState extends State<RolesScreen> {
                               )
                               .toList(),
                         ),
+                      const SizedBox(height: defaultPadding / 2),
+                      SwitchListTile(
+                        value: activo,
+                        onChanged: (value) {
+                          setState(() => activo = value);
+                        },
+                        title: const Text('Activo'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ],
                   ),
                 ),
@@ -278,27 +342,42 @@ class _RolesScreenState extends State<RolesScreen> {
                 if (!formKey.currentState!.validate()) {
                   return;
                 }
+                if (selectedIds.isEmpty) {
+                  showAppToast(
+                    providerContext,
+                    'Selecciona al menos una accion.',
+                    isError: true,
+                  );
+                  return;
+                }
                 final payload = Rol(
+                  id: rol?.id,
                   nombre: nombreController.text.trim(),
                   descripcion: descripcionController.text.trim(),
-                  permisos: selected.toList(),
+                  accionesIds: selectedIds.toList(),
+                  activo: activo,
                 );
                 final provider = providerContext.read<RolesProvider>();
-                final ok = await provider.createRol(payload);
+                final ok = isEditing
+                    ? await provider.updateRol(payload)
+                    : await provider.createRol(payload);
                 if (!ok) {
                   showAppToast(
                     providerContext,
-                    provider.errorMessage ?? 'No se pudo crear el rol.',
+                    provider.errorMessage ?? 'No se pudo guardar el rol.',
                     isError: true,
                   );
                   return;
                 }
                 if (context.mounted) {
                   Navigator.of(context).pop();
-                  showAppToast(providerContext, 'Rol creado.');
+                  showAppToast(
+                    providerContext,
+                    isEditing ? 'Rol actualizado.' : 'Rol creado.',
+                  );
                 }
               },
-              child: const Text('Crear'),
+              child: Text(isEditing ? 'Guardar' : 'Crear'),
             ),
           ],
         );
@@ -309,17 +388,29 @@ class _RolesScreenState extends State<RolesScreen> {
     descripcionController.dispose();
   }
 
-  Future<void> _openAccionDialog(BuildContext providerContext) async {
+  Future<void> _openAccionDialog(
+    BuildContext providerContext, {
+    Accion? accion,
+  }) async {
+    final isEditing = accion != null;
     final formKey = GlobalKey<FormState>();
-    final codigoController = TextEditingController();
-    final descripcionController = TextEditingController();
-    var activa = true;
+    final nombreController =
+        TextEditingController(text: accion?.nombre ?? '');
+    final codigoController =
+        TextEditingController(text: accion?.codigo ?? '');
+    final descripcionController =
+        TextEditingController(text: accion?.descripcion ?? '');
+    final urlController = TextEditingController(text: accion?.url ?? '');
+    final iconoController =
+        TextEditingController(text: accion?.icono ?? '');
+    final tipoController = TextEditingController(text: accion?.tipo ?? '');
+    var activa = accion?.activo ?? true;
 
     await showDialog<void>(
       context: providerContext,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Crear accion'),
+          title: Text(isEditing ? 'Editar accion' : 'Crear accion'),
           content: StatefulBuilder(
             builder: (context, setState) {
               return SizedBox(
@@ -329,6 +420,17 @@ class _RolesScreenState extends State<RolesScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      TextFormField(
+                        controller: nombreController,
+                        decoration: const InputDecoration(labelText: 'Nombre'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Campo requerido';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
                       TextFormField(
                         controller: codigoController,
                         decoration: const InputDecoration(labelText: 'Codigo'),
@@ -350,6 +452,21 @@ class _RolesScreenState extends State<RolesScreen> {
                           }
                           return null;
                         },
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: urlController,
+                        decoration: const InputDecoration(labelText: 'URL'),
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: iconoController,
+                        decoration: const InputDecoration(labelText: 'Icono'),
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: tipoController,
+                        decoration: const InputDecoration(labelText: 'Tipo'),
                       ),
                       const SizedBox(height: defaultPadding / 2),
                       SwitchListTile(
@@ -377,41 +494,165 @@ class _RolesScreenState extends State<RolesScreen> {
                   return;
                 }
                 final payload = Accion(
-                  codigo: codigoController.text.trim().toUpperCase(),
+                  id: accion?.id,
+                  nombre: nombreController.text.trim(),
+                  codigo: codigoController.text.trim(),
                   descripcion: descripcionController.text.trim(),
+                  url: urlController.text.trim(),
+                  icono: iconoController.text.trim(),
+                  tipo: tipoController.text.trim(),
                   activo: activa,
                 );
                 final provider = providerContext.read<AccionesProvider>();
-                final ok = await provider.createAccion(payload);
+                final ok = isEditing
+                    ? await provider.updateAccion(payload)
+                    : await provider.createAccion(payload);
                 if (!ok) {
                   showAppToast(
                     providerContext,
-                    provider.errorMessage ?? 'No se pudo crear la accion.',
+                    provider.errorMessage ?? 'No se pudo guardar la accion.',
                     isError: true,
                   );
                   return;
                 }
                 if (context.mounted) {
                   Navigator.of(context).pop();
-                  showAppToast(providerContext, 'Accion creada.');
+                  showAppToast(
+                    providerContext,
+                    isEditing ? 'Accion actualizada.' : 'Accion creada.',
+                  );
+                  providerContext
+                      .read<RolesProvider>()
+                      .fetchAccionesDisponibles();
                 }
               },
-              child: const Text('Crear'),
+              child: Text(isEditing ? 'Guardar' : 'Crear'),
             ),
           ],
         );
       },
     );
 
+    nombreController.dispose();
     codigoController.dispose();
     descripcionController.dispose();
+    urlController.dispose();
+    iconoController.dispose();
+    tipoController.dispose();
+  }
+
+  Future<void> _confirmDeleteRol(
+    BuildContext providerContext,
+    Rol rol,
+  ) async {
+    if (rol.id == null) {
+      showAppToast(
+        providerContext,
+        'Rol sin ID para eliminar.',
+        isError: true,
+      );
+      return;
+    }
+    final shouldDelete = await showDialog<bool>(
+      context: providerContext,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Eliminar rol'),
+          content: Text(
+            'Deseas eliminar el rol "${rol.nombre}"?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldDelete != true) {
+      return;
+    }
+    final provider = providerContext.read<RolesProvider>();
+    final ok = await provider.deleteRol(rol.id!);
+    if (!ok) {
+      showAppToast(
+        providerContext,
+        provider.errorMessage ?? 'No se pudo eliminar el rol.',
+        isError: true,
+      );
+      return;
+    }
+    showAppToast(providerContext, 'Rol eliminado.');
+  }
+
+  Future<void> _confirmDeleteAccion(
+    BuildContext providerContext,
+    Accion accion,
+  ) async {
+    if (accion.id == null) {
+      showAppToast(
+        providerContext,
+        'Accion sin ID para eliminar.',
+        isError: true,
+      );
+      return;
+    }
+    final shouldDelete = await showDialog<bool>(
+      context: providerContext,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Eliminar accion'),
+          content: Text(
+            'Deseas eliminar la accion "${accion.nombre}"?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldDelete != true) {
+      return;
+    }
+    final provider = providerContext.read<AccionesProvider>();
+    final ok = await provider.deleteAccion(accion.id!);
+    if (!ok) {
+      showAppToast(
+        providerContext,
+        provider.errorMessage ?? 'No se pudo eliminar la accion.',
+        isError: true,
+      );
+      return;
+    }
+    showAppToast(providerContext, 'Accion eliminada.');
+    providerContext.read<RolesProvider>().fetchAccionesDisponibles();
   }
 }
 
 class _RolesList extends StatelessWidget {
-  const _RolesList({required this.roles});
+  const _RolesList({
+    required this.roles,
+    required this.accionesDisponibles,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   final List<Rol> roles;
+  final List<Accion> accionesDisponibles;
+  final void Function(Rol rol) onEdit;
+  final void Function(Rol rol) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -426,6 +667,11 @@ class _RolesList extends StatelessWidget {
       );
     }
 
+    final accionesById = <int, Accion>{
+      for (final accion in accionesDisponibles)
+        if (accion.id != null) accion.id!: accion,
+    };
+
     if (Responsive.isMobile(context)) {
       return Column(
         children: roles
@@ -434,7 +680,20 @@ class _RolesList extends StatelessWidget {
                 child: ListTile(
                   title: Text(rol.nombre),
                   subtitle: Text(rol.descripcion),
-                  trailing: Text('${rol.permisos.length} permisos'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _EstadoChip(activo: rol.activo),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => onEdit(rol),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => onDelete(rol),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             )
@@ -463,6 +722,8 @@ class _RolesList extends StatelessWidget {
                     DataColumn(label: Text('Nombre')),
                     DataColumn(label: Text('Descripcion')),
                     DataColumn(label: Text('Permisos')),
+                    DataColumn(label: Text('Activo')),
+                    DataColumn(label: Text('Acciones')),
                   ],
                   rows: roles
                       .map(
@@ -474,13 +735,32 @@ class _RolesList extends StatelessWidget {
                               Wrap(
                                 spacing: 6,
                                 runSpacing: 6,
-                                children: rol.permisos
+                                children: _resolveRolAccionesLabels(
+                                  rol,
+                                  accionesById,
+                                )
                                     .map(
-                                      (permiso) => Chip(
-                                        label: Text(permiso),
+                                      (label) => Chip(
+                                        label: Text(label),
                                       ),
                                     )
                                     .toList(),
+                              ),
+                            ),
+                            DataCell(_EstadoChip(activo: rol.activo)),
+                            DataCell(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    onPressed: () => onEdit(rol),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () => onDelete(rol),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -497,10 +777,52 @@ class _RolesList extends StatelessWidget {
   }
 }
 
+List<String> _resolveRolAccionesLabels(
+  Rol rol,
+  Map<int, Accion> accionesById,
+) {
+  final seen = <String>{};
+  if (rol.accionesIds.isNotEmpty) {
+    final labels = <String>[];
+    for (final accionId in rol.accionesIds) {
+      final accion = accionesById[accionId];
+      if (accion != null) {
+        final label =
+            accion.nombre.isNotEmpty ? accion.nombre : accion.codigo;
+        if (seen.add(label)) {
+          labels.add(label);
+        }
+      } else {
+        final label = '#$accionId';
+        if (seen.add(label)) {
+          labels.add(label);
+        }
+      }
+    }
+    return labels;
+  }
+  if (rol.permisos.isNotEmpty) {
+    final labels = <String>[];
+    for (final permiso in rol.permisos) {
+      if (seen.add(permiso)) {
+        labels.add(permiso);
+      }
+    }
+    return labels;
+  }
+  return const [];
+}
+
 class _AccionesList extends StatelessWidget {
-  const _AccionesList({required this.acciones});
+  const _AccionesList({
+    required this.acciones,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   final List<Accion> acciones;
+  final void Function(Accion accion) onEdit;
+  final void Function(Accion accion) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -521,9 +843,26 @@ class _AccionesList extends StatelessWidget {
             .map(
               (accion) => Card(
                 child: ListTile(
-                  title: Text(accion.codigo),
-                  subtitle: Text(accion.descripcion),
-                  trailing: _EstadoChip(activo: accion.activo),
+                  title: Text(
+                    accion.nombre.isNotEmpty ? accion.nombre : accion.codigo,
+                  ),
+                  subtitle: Text(
+                    accion.descripcion.isEmpty ? '-' : accion.descripcion,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _EstadoChip(activo: accion.activo),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => onEdit(accion),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => onDelete(accion),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             )
@@ -549,17 +888,55 @@ class _AccionesList extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
                   columns: const [
+                    DataColumn(label: Text('Nombre')),
                     DataColumn(label: Text('Codigo')),
                     DataColumn(label: Text('Descripcion')),
+                    DataColumn(label: Text('URL')),
+                    DataColumn(label: Text('Tipo')),
                     DataColumn(label: Text('Activo')),
+                    DataColumn(label: Text('Acciones')),
                   ],
                   rows: acciones
                       .map(
                         (accion) => DataRow(
                           cells: [
+                            DataCell(
+                              Text(
+                                accion.nombre.isNotEmpty
+                                    ? accion.nombre
+                                    : accion.codigo,
+                              ),
+                            ),
                             DataCell(Text(accion.codigo)),
-                            DataCell(Text(accion.descripcion)),
+                            DataCell(
+                              Text(
+                                accion.descripcion.isEmpty
+                                    ? '-'
+                                    : accion.descripcion,
+                              ),
+                            ),
+                            DataCell(
+                              Text(accion.url.isEmpty ? '-' : accion.url),
+                            ),
+                            DataCell(
+                              Text(accion.tipo.isEmpty ? '-' : accion.tipo),
+                            ),
                             DataCell(_EstadoChip(activo: accion.activo)),
+                            DataCell(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    onPressed: () => onEdit(accion),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () => onDelete(accion),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       )

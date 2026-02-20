@@ -33,4 +33,32 @@ class AccionesProvider extends BaseProvider {
       setLoading(false);
     }
   }
+
+  Future<bool> updateAccion(Accion accion) async {
+    setLoading(true);
+    try {
+      await _service.updateAccion(accion);
+      await fetchAcciones();
+      return true;
+    } catch (error) {
+      setError(resolveError(error));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  Future<bool> deleteAccion(int accionId) async {
+    setLoading(true);
+    try {
+      await _service.deleteAccion(accionId);
+      await fetchAcciones();
+      return true;
+    } catch (error) {
+      setError(resolveError(error));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
 }

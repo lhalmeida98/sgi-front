@@ -1,4 +1,6 @@
 import '../domain/models/auth_info.dart';
+import '../domain/models/menu_accion.dart';
+import '../routing/app_sections.dart';
 import '../services/auth_storage.dart';
 import '../services/auth_service.dart';
 import '../services/auth_session.dart';
@@ -13,11 +15,38 @@ class AuthProvider extends BaseProvider {
 
   bool get isAuthenticated => _authInfo != null && AuthSession.isAuthenticated;
 
-  bool get isAdmin => (_authInfo?.rol ?? '').toUpperCase() == 'ADMIN';
+  bool get isAdmin => _authInfo?.isAdmin ?? false;
 
   int? get empresaId => _authInfo?.empresaId;
 
-  String? get rol => _authInfo?.rol;
+  int? get usuarioId => _authInfo?.usuarioId;
+
+  String get rol => _authInfo?.rolPrincipal ?? '';
+
+  List<String> get roles => _authInfo?.roles ?? [];
+
+  List<String> get acciones =>
+      _authInfo?.acciones.map((a) => a.nombre).toList() ?? [];
+
+  List<MenuAccion> get menuAcciones => _authInfo?.acciones ?? [];
+
+  bool canAccessSection(AppSection section) {
+    if (section == AppSection.dashboard) {
+      return true;
+    }
+    if (isAdmin) {
+      return true;
+    }
+    final acciones = _authInfo?.acciones ?? [];
+    if (acciones.isEmpty) {
+      return section != AppSection.usuarios &&
+          section != AppSection.empresas &&
+          section != AppSection.roles;
+    }
+    return acciones.any(
+      (accion) => resolveSectionForAccion(accion)?.section == section,
+    );
+  }
 
   String? get email => AuthSession.email;
 
@@ -35,8 +64,10 @@ class AuthProvider extends BaseProvider {
         AuthSession.update(
           tokenValue: stored.info.token,
           tipoValue: stored.info.tipo,
-          rolValue: stored.info.rol,
+          rolesValue: stored.info.roles,
+          accionesValue: stored.info.acciones.map((a) => a.nombre).toList(),
           empresaIdValue: stored.info.empresaId,
+          usuarioIdValue: stored.info.usuarioId,
           emailValue: stored.email,
         );
       }
@@ -47,21 +78,27 @@ class AuthProvider extends BaseProvider {
   }
 
   Future<bool> login({
-    required String email,
+    required String usuarioOrEmail,
     required String password,
   }) async {
     setLoading(true);
     try {
-      final info = await _service.login(email: email, password: password);
+      final info = await _service.login(
+        usuarioOrEmail: usuarioOrEmail,
+        password: password,
+      );
       _authInfo = info;
+      final identifier = usuarioOrEmail.trim();
       AuthSession.update(
         tokenValue: info.token,
         tipoValue: info.tipo,
-        rolValue: info.rol,
+        rolesValue: info.roles,
+        accionesValue: info.acciones.map((a) => a.nombre).toList(),
         empresaIdValue: info.empresaId,
-        emailValue: email,
+        usuarioIdValue: info.usuarioId,
+        emailValue: identifier,
       );
-      await AuthStorage.save(info: info, email: email);
+      await AuthStorage.save(info: info, email: identifier);
       setError(null);
       notifyListeners();
       return true;

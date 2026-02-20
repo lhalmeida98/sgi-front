@@ -24,4 +24,23 @@ class AccionesService {
     }
     return Accion.fromJson(map);
   }
+
+  Future<Accion> updateAccion(Accion accion) async {
+    if (accion.id == null) {
+      throw ApiException('Accion sin ID para actualizar.');
+    }
+    final response = await _client.put(
+      '/api/acciones/${accion.id}',
+      body: accion.toJson(),
+    );
+    final map = extractMap(response);
+    if (map.isEmpty) {
+      return accion;
+    }
+    return Accion.fromJson(map);
+  }
+
+  Future<void> deleteAccion(int accionId) async {
+    await _client.delete('/api/acciones/$accionId');
+  }
 }

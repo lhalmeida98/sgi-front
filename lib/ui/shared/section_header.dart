@@ -28,7 +28,9 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isMobile = Responsive.isMobile(context);
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (!Responsive.isDesktop(context))
           IconButton(
@@ -36,37 +38,80 @@ class SectionHeader extends StatelessWidget {
             onPressed: context.read<MenuAppController>().controlMenu,
           ),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.titleLarge,
-              ),
-              if (subtitle != null)
-                Text(
-                  subtitle!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withAlpha(153),
-                  ),
+          child: isMobile
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    if (subtitle != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          subtitle!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withAlpha(153),
+                          ),
+                        ),
+                      ),
+                    if (_showSearch)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: defaultPadding / 2,
+                        ),
+                        child: _SearchField(
+                          hintText: searchHint!,
+                          onChanged: onSearchChanged!,
+                        ),
+                      ),
+                    if (actions.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: defaultPadding / 2,
+                        ),
+                        child: Wrap(
+                          spacing: defaultPadding / 2,
+                          runSpacing: defaultPadding / 2,
+                          children: actions,
+                        ),
+                      ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withAlpha(153),
+                        ),
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
-        if (_showSearch && !Responsive.isMobile(context))
-          Expanded(
-            flex: 2,
-            child: _SearchField(
-              hintText: searchHint!,
-              onChanged: onSearchChanged!,
+        if (!isMobile) ...[
+          if (_showSearch)
+            Expanded(
+              flex: 2,
+              child: _SearchField(
+                hintText: searchHint!,
+                onChanged: onSearchChanged!,
+              ),
             ),
-          ),
-        if (actions.isNotEmpty) const SizedBox(width: defaultPadding),
-        ...actions,
-        const SizedBox(width: defaultPadding),
-        const ThemeToggleButton(),
-        const SizedBox(width: defaultPadding),
-        const ProfileCard(),
+          if (actions.isNotEmpty) const SizedBox(width: defaultPadding),
+          ...actions,
+          const SizedBox(width: defaultPadding),
+          const ThemeToggleButton(),
+          const SizedBox(width: defaultPadding),
+          const ProfileCard(),
+        ],
       ],
     );
   }

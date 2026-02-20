@@ -28,6 +28,27 @@ List<Map<String, dynamic>> extractList(dynamic data) {
   return [];
 }
 
+List<String> extractStringList(dynamic data) {
+  if (data is List) {
+    return data.map((item) => item.toString()).toList();
+  }
+  if (data is Map) {
+    for (final key in const ['data', 'items', 'content', 'results']) {
+      final value = data[key];
+      if (value is List) {
+        return value.map((item) => item.toString()).toList();
+      }
+    }
+    for (final entry in data.entries) {
+      final value = entry.value;
+      if (value is List) {
+        return value.map((item) => item.toString()).toList();
+      }
+    }
+  }
+  return [];
+}
+
 Map<String, dynamic> extractMap(dynamic data) {
   if (data is Map) {
     for (final key in const ['data', 'item', 'result']) {

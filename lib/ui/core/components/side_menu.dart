@@ -6,6 +6,7 @@ import '../../../routing/app_sections.dart';
 import '../../../states/auth_provider.dart';
 import '../../../states/menu_app_controller.dart';
 import '../../../utils/responsive.dart';
+import '../../../domain/models/menu_accion.dart';
 
 class SideMenu extends StatelessWidget {
   const SideMenu({super.key});
@@ -17,13 +18,13 @@ class SideMenu extends StatelessWidget {
     final authProvider = context.watch<AuthProvider>();
     final isCollapsed =
         Responsive.isDesktop(context) && controller.isMenuCollapsed;
-    final visibleSections = authProvider.isAdmin
-        ? appSections
-        : appSections
-            .where((item) => item.section != AppSection.usuarios)
-            .where((item) => item.section != AppSection.empresas)
-            .where((item) => item.section != AppSection.roles)
-            .toList();
+    final acciones = authProvider.menuAcciones
+        .where((accion) => accion.activo ?? true)
+        .toList();
+    final menuAcciones = _withAdminExtras(
+      acciones,
+      include: authProvider.isAdmin,
+    );
     return Drawer(
       backgroundColor: theme.colorScheme.surface,
       child: Column(
@@ -31,24 +32,118 @@ class SideMenu extends StatelessWidget {
           _SideMenuHeader(isCollapsed: isCollapsed),
           Expanded(
             child: ListView(
-              children: [
-                for (final item in visibleSections)
-                  DrawerListTile(
-                    title: item.title,
-                    svgSrc: item.icon,
-                    selected: controller.activeSection == item.section,
-                    isCollapsed: isCollapsed,
-                    press: () {
-                      controller.setSection(item.section);
-                      if (!Responsive.isDesktop(context)) {
-                        Navigator.of(context).pop();
-                      }
-                    },
-                  ),
-              ],
+              children: _buildGroupedMenu(
+                context,
+                acciones: menuAcciones,
+                isCollapsed: isCollapsed,
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+List<MenuAccion> _withAdminExtras(
+  List<MenuAccion> acciones, {
+  required bool include,
+}) {
+  if (!include) {
+    return acciones;
+  }
+  final items = List<MenuAccion>.from(acciones);
+  final adminSections = appSections.where(
+    (item) => item.section == AppSection.usuarios || item.section == AppSection.roles,
+  );
+  for (final section in adminSections) {
+    final exists = items.any(section.matchesAccion);
+    if (!exists) {
+      items.add(
+        MenuAccion(
+          nombre: section.title,
+          descripcion: section.description,
+          url: section.codigo,
+          icono: '',
+          tipo: section.tipo,
+          activo: true,
+        ),
+      );
+    }
+  }
+  return items;
+}
+
+List<Widget> _buildGroupedMenu(
+  BuildContext context, {
+  required List<MenuAccion> acciones,
+  required bool isCollapsed,
+}) {
+  final controller = context.watch<MenuAppController>();
+  final resolvedAcciones = acciones
+      .where((accion) => resolveSectionForAccion(accion) != null)
+      .toList();
+  final grouped = <String, List<MenuAccion>>{};
+  for (final accion in resolvedAcciones) {
+    final matched = resolveSectionForAccion(accion);
+    final tipo = accion.tipo.trim().isNotEmpty
+        ? accion.tipo.trim()
+        : (matched?.tipo.isNotEmpty ?? false)
+            ? matched!.tipo
+            : 'Otros';
+    grouped.putIfAbsent(tipo, () => []).add(accion);
+  }
+
+  final widgets = <Widget>[];
+  for (final entry in grouped.entries) {
+    if (!isCollapsed) {
+      widgets.add(_MenuGroupHeader(title: entry.key));
+    } else {
+      widgets.add(const SizedBox(height: 8));
+    }
+    for (final accion in entry.value) {
+      final matched = resolveSectionForAccion(accion);
+      widgets.add(
+        DrawerListTile(
+          title: accion.nombre,
+          svgSrc: matched?.icon,
+          icon: matched == null ? Icons.circle_outlined : null,
+          selected: matched != null &&
+              controller.activeSection == matched.section,
+          isCollapsed: isCollapsed,
+          enabled: matched != null,
+          press: matched == null
+              ? null
+              : () {
+                  controller.setSection(matched.section);
+                  if (!Responsive.isDesktop(context)) {
+                    Navigator.of(context).pop();
+                  }
+                },
+        ),
+      );
+    }
+  }
+  return widgets;
+}
+
+class _MenuGroupHeader extends StatelessWidget {
+  const _MenuGroupHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      child: Text(
+        title.toUpperCase(),
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onSurface.withAlpha(140),
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
+        ),
       ),
     );
   }
@@ -111,34 +206,47 @@ class DrawerListTile extends StatelessWidget {
     super.key,
     // For selecting those three line once press "Command+D"
     required this.title,
-    required this.svgSrc,
-    required this.press,
+    this.svgSrc,
+    this.icon,
+    this.press,
     required this.selected,
     required this.isCollapsed,
+    this.enabled = true,
   });
 
-  final String title, svgSrc;
-  final VoidCallback press;
+  final String title;
+  final String? svgSrc;
+  final IconData? icon;
+  final VoidCallback? press;
   final bool selected;
   final bool isCollapsed;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurfaceMuted =
         Theme.of(context).colorScheme.onSurface.withAlpha(179);
-    final color = selected ? theme.colorScheme.primary : onSurfaceMuted;
+    final mutedColor =
+        enabled ? onSurfaceMuted : theme.colorScheme.onSurface.withAlpha(90);
+    final color = selected ? theme.colorScheme.primary : mutedColor;
     final tile = ListTile(
-      onTap: press,
+      onTap: enabled ? press : null,
       horizontalTitleGap: isCollapsed ? 0.0 : 12.0,
       contentPadding: EdgeInsets.symmetric(horizontal: isCollapsed ? 14 : 16),
       selected: selected,
       selectedTileColor: theme.colorScheme.primary.withAlpha(26),
-      leading: SvgPicture.asset(
-        svgSrc,
-        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-        height: 16,
-      ),
+      leading: svgSrc != null
+          ? SvgPicture.asset(
+              svgSrc!,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+              height: 16,
+            )
+          : Icon(
+              icon ?? Icons.circle,
+              color: color,
+              size: 16,
+            ),
       title: isCollapsed
           ? null
           : Text(

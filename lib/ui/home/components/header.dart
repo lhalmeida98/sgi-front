@@ -122,9 +122,12 @@ class ProfileCard extends StatelessWidget {
     final theme = Theme.of(context);
     final authProvider = context.watch<AuthProvider>();
     final name = authProvider.email ?? 'Usuario';
-    final subtitle = authProvider.rol == null
+    final rolesLabel = authProvider.roles.isEmpty
         ? 'Sesion activa'
-        : '${authProvider.rol} • Empresa ${authProvider.empresaId ?? '-'}';
+        : authProvider.roles.join(', ');
+    final subtitle = authProvider.empresaId == null
+        ? rolesLabel
+        : '$rolesLabel • Empresa ${authProvider.empresaId ?? '-'}';
     return PopupMenuButton<String>(
       tooltip: 'Sesion',
       onSelected: (value) {

@@ -77,10 +77,7 @@ class _MainShell extends StatelessWidget {
     final menuController = context.watch<MenuAppController>();
     final authProvider = context.watch<AuthProvider>();
     final activeSection = menuController.activeSection;
-    if (!authProvider.isAdmin &&
-        (activeSection == AppSection.usuarios ||
-            activeSection == AppSection.empresas ||
-            activeSection == AppSection.roles)) {
+    if (!authProvider.canAccessSection(activeSection)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         menuController.setSection(AppSection.dashboard);
       });

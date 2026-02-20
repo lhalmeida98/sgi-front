@@ -15,16 +15,22 @@ class QuickActionsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final authProvider = context.watch<AuthProvider>();
-    final actions = appSections
-        .where((item) => item.section != AppSection.dashboard)
-        .where(
-          (item) =>
-              authProvider.isAdmin ||
-              (item.section != AppSection.usuarios &&
-                  item.section != AppSection.empresas &&
-                  item.section != AppSection.roles),
-        )
-        .toList();
+    final acciones = authProvider.menuAcciones;
+    final resolvedSections = resolveSectionsFromAcciones(acciones);
+    final actions = acciones.isEmpty
+        ? appSections
+            .where((item) => item.section != AppSection.dashboard)
+            .where(
+              (item) =>
+                  authProvider.isAdmin ||
+                  (item.section != AppSection.usuarios &&
+                      item.section != AppSection.empresas &&
+                      item.section != AppSection.roles),
+            )
+            .toList()
+        : resolvedSections
+            .where((item) => item.section != AppSection.dashboard)
+            .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -47,4 +47,32 @@ class RolesProvider extends BaseProvider {
       setLoading(false);
     }
   }
+
+  Future<bool> updateRol(Rol rol) async {
+    setLoading(true);
+    try {
+      await _service.updateRol(rol);
+      await fetchRoles();
+      return true;
+    } catch (error) {
+      setError(resolveError(error));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  Future<bool> deleteRol(int rolId) async {
+    setLoading(true);
+    try {
+      await _service.deleteRol(rolId);
+      await fetchRoles();
+      return true;
+    } catch (error) {
+      setError(resolveError(error));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
 }

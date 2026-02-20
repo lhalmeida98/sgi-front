@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../domain/models/empresa.dart';
+import '../domain/models/usuario_empresa.dart';
 import '../resource/theme/dimens.dart';
 import '../services/api_client.dart';
 import '../services/empresas_service.dart';
+import '../services/usuarios_service.dart';
 import '../states/auth_provider.dart';
 import '../states/empresas_provider.dart';
 import '../ui/shared/feedback.dart';
@@ -21,12 +23,18 @@ class EmpresasScreen extends StatefulWidget {
 
 class _EmpresasScreenState extends State<EmpresasScreen> {
   late final EmpresasProvider _provider;
+  List<UsuarioEmpresa> _usuarioEmpresas = [];
+  bool _isLoadingUsuarioEmpresas = false;
+  String? _usuarioEmpresasError;
 
   @override
   void initState() {
     super.initState();
     _provider = EmpresasProvider(EmpresasService(ApiClient()));
     _provider.fetchEmpresas();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchUsuarioEmpresas();
+    });
   }
 
   @override
@@ -41,7 +49,15 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
       value: _provider,
       child: Consumer<EmpresasProvider>(
         builder: (context, provider, _) {
+          final authProvider = context.watch<AuthProvider>();
           final isMobile = Responsive.isMobile(context);
+          final userEmpresas = _usuarioEmpresas
+              .map((item) => item.empresa)
+              .whereType<Empresa>()
+              .toList();
+          final empresas = userEmpresas.isNotEmpty
+              ? userEmpresas
+              : provider.empresas;
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(defaultPadding),
@@ -54,24 +70,33 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                     actions: [
                       IconButton(
                         tooltip: 'Refrescar',
-                        onPressed: provider.fetchEmpresas,
+                        onPressed: () {
+                          provider.fetchEmpresas();
+                          _fetchUsuarioEmpresas();
+                        },
                         icon: const Icon(Icons.refresh),
                       ),
-                      if (isMobile)
-                        IconButton(
-                          tooltip: 'Crear empresa',
-                          onPressed: () => _openEmpresaDialog(context),
-                          icon: const Icon(Icons.add),
-                        )
-                      else
-                        FilledButton.icon(
-                          onPressed: () => _openEmpresaDialog(context),
-                          icon: const Icon(Icons.add),
-                          label: const Text('Crear empresa'),
-                        ),
+                      if (authProvider.isAdmin)
+                        if (isMobile)
+                          IconButton(
+                            tooltip: 'Crear empresa',
+                            onPressed: () => _openEmpresaDialog(context),
+                            icon: const Icon(Icons.add),
+                          )
+                        else
+                          FilledButton.icon(
+                            onPressed: () => _openEmpresaDialog(context),
+                            icon: const Icon(Icons.add),
+                            label: const Text('Crear empresa'),
+                          ),
                     ],
                   ),
                   if (provider.isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(top: defaultPadding / 2),
+                      child: LinearProgressIndicator(),
+                    ),
+                  if (_isLoadingUsuarioEmpresas)
                     const Padding(
                       padding: EdgeInsets.only(top: defaultPadding / 2),
                       child: LinearProgressIndicator(),
@@ -86,8 +111,19 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                         ),
                       ),
                     ),
+                  if (_usuarioEmpresasError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: defaultPadding / 2),
+                      child: Text(
+                        _usuarioEmpresasError!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: defaultPadding),
                   _EmpresasList(
+                    empresas: empresas,
                     onUploadFirma: (empresa) => _showFirmaDialog(
                       context,
                       empresa,
@@ -108,6 +144,41 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _fetchUsuarioEmpresas() async {
+    final authProvider = context.read<AuthProvider>();
+    final usuarioId = authProvider.usuarioId;
+    if (usuarioId == null) {
+      return;
+    }
+    setState(() {
+      _isLoadingUsuarioEmpresas = true;
+      _usuarioEmpresasError = null;
+    });
+    try {
+      final service = UsuariosService(ApiClient());
+      final items = await service.fetchUsuarioEmpresas(usuarioId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _usuarioEmpresas = items;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _usuarioEmpresasError =
+            'No se pudo cargar empresas del usuario.';
+        _usuarioEmpresas = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingUsuarioEmpresas = false);
+      }
+    }
   }
 
   Future<void> _openEmpresaDialog(
@@ -676,25 +747,20 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
 
 class _EmpresasList extends StatelessWidget {
   const _EmpresasList({
+    required this.empresas,
     required this.onUploadFirma,
     required this.onUploadLogo,
     required this.onEditEmpresa,
   });
 
+  final List<Empresa> empresas;
   final void Function(Empresa empresa) onUploadFirma;
   final void Function(Empresa empresa) onUploadLogo;
   final void Function(Empresa empresa) onEditEmpresa;
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<EmpresasProvider>();
-    final authProvider = context.watch<AuthProvider>();
-    var items = provider.empresas;
-    if (authProvider.empresaId != null) {
-      items = items
-          .where((empresa) => empresa.id == authProvider.empresaId)
-          .toList();
-    }
+    final items = empresas;
 
     if (items.isEmpty) {
       return Container(

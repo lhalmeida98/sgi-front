@@ -8,15 +8,19 @@ class AuthService {
   final ApiClient _client;
 
   Future<AuthInfo> login({
-    required String email,
+    required String usuarioOrEmail,
     required String password,
   }) async {
+    final identifier = usuarioOrEmail.trim();
+    final isEmail = identifier.contains('@');
+    final payload = <String, dynamic>{
+      if (isEmail) 'email': identifier,
+      if (!isEmail) 'usuario': identifier,
+      'password': password,
+    };
     final response = await _client.post(
       '/api/auth/login',
-      body: {
-        'email': email,
-        'password': password,
-      },
+      body: payload,
     );
     final map = extractMap(response);
     return AuthInfo.fromJson(map);

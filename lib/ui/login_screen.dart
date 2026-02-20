@@ -16,13 +16,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscure = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -81,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Responsive(
                     mobile: _LoginCard(
                       formKey: _formKey,
-                      emailController: _emailController,
+                      identifierController: _identifierController,
                       passwordController: _passwordController,
                       obscure: _obscure,
                       onToggleObscure: () {
@@ -100,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Expanded(
                           child: _LoginCard(
                             formKey: _formKey,
-                            emailController: _emailController,
+                            identifierController: _identifierController,
                             passwordController: _passwordController,
                             obscure: _obscure,
                             onToggleObscure: () {
@@ -124,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           flex: 4,
                           child: _LoginCard(
                             formKey: _formKey,
-                            emailController: _emailController,
+                            identifierController: _identifierController,
                             passwordController: _passwordController,
                             obscure: _obscure,
                             onToggleObscure: () {
@@ -154,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     final authProvider = context.read<AuthProvider>();
     final ok = await authProvider.login(
-      email: _emailController.text.trim(),
+      usuarioOrEmail: _identifierController.text.trim(),
       password: _passwordController.text.trim(),
     );
     if (!ok && context.mounted) {
@@ -253,7 +253,7 @@ class _FeatureChip extends StatelessWidget {
 class _LoginCard extends StatelessWidget {
   const _LoginCard({
     required this.formKey,
-    required this.emailController,
+    required this.identifierController,
     required this.passwordController,
     required this.obscure,
     required this.onToggleObscure,
@@ -263,7 +263,7 @@ class _LoginCard extends StatelessWidget {
   });
 
   final GlobalKey<FormState> formKey;
-  final TextEditingController emailController;
+  final TextEditingController identifierController;
   final TextEditingController passwordController;
   final bool obscure;
   final VoidCallback onToggleObscure;
@@ -323,15 +323,12 @@ class _LoginCard extends StatelessWidget {
             child: Column(
               children: [
                 TextFormField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email'),
+                  controller: identifierController,
+                  decoration:
+                      const InputDecoration(labelText: 'Usuario o email'),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Campo requerido';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Email invalido';
                     }
                     return null;
                   },

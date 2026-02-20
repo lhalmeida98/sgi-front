@@ -7,11 +7,13 @@ class UsuariosProvider extends BaseProvider {
 
   final UsuariosService _service;
   List<Usuario> usuarios = [];
+  bool _includeAll = false;
 
-  Future<void> fetchUsuarios() async {
+  Future<void> fetchUsuarios({bool includeAll = false}) async {
+    _includeAll = includeAll;
     setLoading(true);
     try {
-      usuarios = await _service.fetchUsuarios();
+      usuarios = await _service.fetchUsuarios(includeAll: includeAll);
       setError(null);
     } catch (error) {
       setError(resolveError(error));
@@ -24,7 +26,7 @@ class UsuariosProvider extends BaseProvider {
     setLoading(true);
     try {
       await _service.createUsuario(usuario, password: password);
-      await fetchUsuarios();
+      await fetchUsuarios(includeAll: _includeAll);
       return true;
     } catch (error) {
       setError(resolveError(error));
@@ -38,7 +40,21 @@ class UsuariosProvider extends BaseProvider {
     setLoading(true);
     try {
       await _service.updateUsuario(usuario, password: password);
-      await fetchUsuarios();
+      await fetchUsuarios(includeAll: _includeAll);
+      return true;
+    } catch (error) {
+      setError(resolveError(error));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  Future<bool> deleteUsuario(int usuarioId) async {
+    setLoading(true);
+    try {
+      await _service.deleteUsuario(usuarioId);
+      await fetchUsuarios(includeAll: _includeAll);
       return true;
     } catch (error) {
       setError(resolveError(error));

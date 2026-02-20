@@ -3,14 +3,74 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../domain/models/usuario_empresa.dart';
 import '../../resource/theme/dimens.dart';
 import '../../routing/app_sections.dart';
+import '../../services/api_client.dart';
+import '../../services/usuarios_service.dart';
+import '../../states/auth_provider.dart';
 import '../../states/menu_app_controller.dart';
 import '../../utils/responsive.dart';
 import 'components/header.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  bool _loadingEmpresas = false;
+  List<UsuarioEmpresa> _empresas = [];
+  int? _selectedEmpresaId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadEmpresas();
+    });
+  }
+
+  Future<void> _loadEmpresas() async {
+    final auth = context.read<AuthProvider>();
+    final userId = auth.usuarioId;
+    if (userId == null) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() => _loadingEmpresas = true);
+    try {
+      final service = UsuariosService(ApiClient());
+      final empresas = await service.fetchUsuarioEmpresas(userId);
+      if (!mounted) {
+        return;
+      }
+      _empresas = empresas;
+      _selectedEmpresaId = _resolvePrincipalEmpresaId(empresas);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _empresas = [];
+    } finally {
+      if (mounted) {
+        setState(() => _loadingEmpresas = false);
+      }
+    }
+  }
+
+  int? _resolvePrincipalEmpresaId(List<UsuarioEmpresa> empresas) {
+    for (final item in empresas) {
+      if (item.principal) {
+        return item.empresaId;
+      }
+    }
+    return empresas.isNotEmpty ? empresas.first.empresaId : null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +82,15 @@ class DashboardScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Header(),
+            const SizedBox(height: defaultPadding),
+            _EmpresaSelector(
+              empresas: _empresas,
+              selectedEmpresaId: _selectedEmpresaId,
+              isLoading: _loadingEmpresas,
+              onChanged: (value) {
+                setState(() => _selectedEmpresaId = value);
+              },
+            ),
             const SizedBox(height: defaultPadding * 1.5),
             const _StatsGrid(),
             const SizedBox(height: defaultPadding * 1.5),
@@ -71,6 +140,71 @@ class _StatsGrid extends StatelessWidget {
       },
     );
   }
+}
+
+class _EmpresaSelector extends StatelessWidget {
+  const _EmpresaSelector({
+    required this.empresas,
+    required this.selectedEmpresaId,
+    required this.isLoading,
+    required this.onChanged,
+  });
+
+  final List<UsuarioEmpresa> empresas;
+  final int? selectedEmpresaId;
+  final bool isLoading;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const LinearProgressIndicator();
+    }
+    if (empresas.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final items = empresas
+        .map(
+          (item) => DropdownMenuItem<int>(
+            value: item.empresaId,
+            child: Text(_empresaLabel(item)),
+          ),
+        )
+        .toList();
+    return Row(
+      children: [
+        Text(
+          'Empresa',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: DropdownButtonFormField<int>(
+            value: selectedEmpresaId ?? empresas.first.empresaId,
+            items: items,
+            onChanged: onChanged,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _empresaLabel(UsuarioEmpresa item) {
+  final empresa = item.empresa;
+  if (empresa != null) {
+    if (empresa.nombreComercial.isNotEmpty) {
+      return empresa.nombreComercial;
+    }
+    if (empresa.razonSocial.isNotEmpty) {
+      return empresa.razonSocial;
+    }
+  }
+  return item.empresaId.toString();
 }
 
 class _SectionTitle extends StatelessWidget {
