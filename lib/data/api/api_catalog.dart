@@ -21,6 +21,21 @@ final List<ApiModule> apiModules = [
     ],
   ),
   ApiModule(
+    title: "Dashboard",
+    description: "Resumen y metricas del negocio.",
+    icon: "assets/icons/menu_dashboard.svg",
+    color: Color(0xFF2F80ED),
+    endpoints: const [
+      ApiEndpoint(
+        method: ApiMethod.get,
+        path: "/api/dashboard/resumen",
+        title: "Resumen dashboard",
+        description: "Resumen general (usa empresa del usuario).",
+        actionLabel: "Consultar",
+      ),
+    ],
+  ),
+  ApiModule(
     title: "Catalogos",
     description: "Gestion de productos, clientes y categorias.",
     icon: "assets/icons/menu_doc.svg",

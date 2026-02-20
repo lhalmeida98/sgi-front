@@ -7,11 +7,14 @@ import '../../domain/models/usuario_empresa.dart';
 import '../../resource/theme/dimens.dart';
 import '../../routing/app_sections.dart';
 import '../../services/api_client.dart';
+import '../../services/dashboard_service.dart';
+import '../../services/empresas_service.dart';
 import '../../services/usuarios_service.dart';
 import '../../states/auth_provider.dart';
 import '../../states/menu_app_controller.dart';
 import '../../utils/responsive.dart';
 import 'components/header.dart';
+import '../../domain/models/dashboard_resumen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,12 +25,17 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _loadingEmpresas = false;
+  bool _loadingResumen = false;
+  String? _resumenError;
+  DashboardResumen? _resumen;
+  late final DashboardService _dashboardService;
   List<UsuarioEmpresa> _empresas = [];
   int? _selectedEmpresaId;
 
   @override
   void initState() {
     super.initState();
+    _dashboardService = DashboardService(ApiClient());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadEmpresas();
     });
@@ -36,7 +44,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadEmpresas() async {
     final auth = context.read<AuthProvider>();
     final userId = auth.usuarioId;
-    if (userId == null) {
+    if (userId == null && !auth.isAdmin) {
       return;
     }
     if (!mounted) {
@@ -44,13 +52,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     setState(() => _loadingEmpresas = true);
     try {
-      final service = UsuariosService(ApiClient());
-      final empresas = await service.fetchUsuarioEmpresas(userId);
+      if (auth.isAdmin) {
+        final service = EmpresasService(ApiClient());
+        final empresas = await service.fetchEmpresas();
+        _empresas = empresas
+            .where((empresa) => empresa.id != null)
+            .map(
+              (empresa) => UsuarioEmpresa(
+                empresaId: empresa.id!,
+                principal: empresa.id == auth.empresaId,
+                empresa: empresa,
+              ),
+            )
+            .toList();
+      } else {
+        final service = UsuariosService(ApiClient());
+        _empresas = await service.fetchUsuarioEmpresas(userId!);
+      }
       if (!mounted) {
         return;
       }
-      _empresas = empresas;
-      _selectedEmpresaId = _resolvePrincipalEmpresaId(empresas);
+      _selectedEmpresaId = _resolvePrincipalEmpresaId(_empresas);
     } catch (_) {
       if (!mounted) {
         return;
@@ -59,6 +81,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } finally {
       if (mounted) {
         setState(() => _loadingEmpresas = false);
+        _loadResumen(empresaId: _selectedEmpresaId);
+      }
+    }
+  }
+
+  Future<void> _loadResumen({int? empresaId}) async {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _loadingResumen = true;
+      _resumenError = null;
+    });
+    try {
+      final resumen = await _dashboardService.fetchResumen(
+        empresaId: empresaId,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _resumen = resumen);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _resumen = null;
+        _resumenError = _resolveError(error);
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loadingResumen = false);
       }
     }
   }
@@ -89,35 +143,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
               isLoading: _loadingEmpresas,
               onChanged: (value) {
                 setState(() => _selectedEmpresaId = value);
+                _loadResumen(empresaId: value);
               },
             ),
             const SizedBox(height: defaultPadding * 1.5),
-            const _StatsGrid(),
+            if (_loadingResumen)
+              const Padding(
+                padding: EdgeInsets.only(bottom: defaultPadding),
+                child: LinearProgressIndicator(),
+              ),
+            if (_resumenError != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: defaultPadding),
+                child: Text(
+                  _resumenError!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            _StatsGrid(resumen: _resumen),
             const SizedBox(height: defaultPadding * 1.5),
             const _SectionTitle(title: 'Accesos rapidos'),
             const SizedBox(height: defaultPadding),
-            const _CashflowCard(),
+            _CashflowCard(resumen: _resumen),
             const SizedBox(height: defaultPadding * 1.5),
             const _SectionTitle(title: 'Acciones rapidas'),
             const SizedBox(height: defaultPadding),
             Responsive(
-              mobile: const _MobileSummary(),
-              tablet: const _TabletSummary(),
-              desktop: const _DesktopSummary(),
+              mobile: _MobileSummary(resumen: _resumen),
+              tablet: _TabletSummary(resumen: _resumen),
+              desktop: _DesktopSummary(resumen: _resumen),
             ),
           ],
         ),
       ),
     );
   }
+
+  String _resolveError(Object error) {
+    if (error is ApiException) {
+      return error.message;
+    }
+    return error.toString();
+  }
 }
 
 class _StatsGrid extends StatelessWidget {
-  const _StatsGrid();
+  const _StatsGrid({required this.resumen});
+
+  final DashboardResumen? resumen;
 
   @override
   Widget build(BuildContext context) {
-    final stats = _DashboardStatData.samples;
+    final stats = _DashboardStatData.fromResumen(resumen);
     final size = MediaQuery.of(context).size;
     final crossAxisCount = size.width < 650
         ? 1
@@ -162,6 +241,37 @@ class _EmpresaSelector extends StatelessWidget {
     }
     if (empresas.isEmpty) {
       return const SizedBox.shrink();
+    }
+    if (empresas.length == 1) {
+      final label = _empresaLabel(empresas.first);
+      final theme = Theme.of(context);
+      return Row(
+        children: [
+          Text(
+            'Empresa',
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withAlpha(153),
+                ),
+              ),
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
     }
     final items = empresas
         .map(
@@ -304,7 +414,9 @@ class _StatCard extends StatelessWidget {
 }
 
 class _CashflowCard extends StatelessWidget {
-  const _CashflowCard();
+  const _CashflowCard({required this.resumen});
+
+  final DashboardResumen? resumen;
 
   @override
   Widget build(BuildContext context) {
@@ -319,9 +431,11 @@ class _CashflowCard extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: defaultPadding),
-          const SizedBox(
+          SizedBox(
             height: 160,
-            child: _MiniLineChart(),
+            child: _MiniLineChart(
+              values: _resolveCashflowValues(resumen),
+            ),
           ),
           const SizedBox(height: defaultPadding),
           Wrap(
@@ -406,57 +520,78 @@ class _QuickActionButton extends StatelessWidget {
 }
 
 class _MobileSummary extends StatelessWidget {
-  const _MobileSummary();
+  const _MobileSummary({required this.resumen});
+
+  final DashboardResumen? resumen;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: const [
-        _RecentInvoicesCard(),
-        SizedBox(height: defaultPadding),
-        _TopProductsCard(),
+      children: [
+        _RecentInvoicesCard(resumen: resumen),
+        const SizedBox(height: defaultPadding),
+        _TopProductsCard(resumen: resumen),
+        const SizedBox(height: defaultPadding),
+        _LowStockCard(resumen: resumen),
       ],
     );
   }
 }
 
 class _TabletSummary extends StatelessWidget {
-  const _TabletSummary();
+  const _TabletSummary({required this.resumen});
+
+  final DashboardResumen? resumen;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: const [
-        _RecentInvoicesCard(),
-        SizedBox(height: defaultPadding),
-        _TopProductsCard(),
+      children: [
+        _RecentInvoicesCard(resumen: resumen),
+        const SizedBox(height: defaultPadding),
+        _TopProductsCard(resumen: resumen),
+        const SizedBox(height: defaultPadding),
+        _LowStockCard(resumen: resumen),
       ],
     );
   }
 }
 
 class _DesktopSummary extends StatelessWidget {
-  const _DesktopSummary();
+  const _DesktopSummary({required this.resumen});
+
+  final DashboardResumen? resumen;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        Expanded(flex: 3, child: _RecentInvoicesCard()),
-        SizedBox(width: defaultPadding),
-        Expanded(flex: 2, child: _TopProductsCard()),
+      children: [
+        Expanded(flex: 3, child: _RecentInvoicesCard(resumen: resumen)),
+        const SizedBox(width: defaultPadding),
+        Expanded(
+          flex: 2,
+          child: Column(
+            children: [
+              _TopProductsCard(resumen: resumen),
+              const SizedBox(height: defaultPadding),
+              _LowStockCard(resumen: resumen),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
 class _RecentInvoicesCard extends StatelessWidget {
-  const _RecentInvoicesCard();
+  const _RecentInvoicesCard({required this.resumen});
+
+  final DashboardResumen? resumen;
 
   @override
   Widget build(BuildContext context) {
-    final rows = _InvoiceRowData.samples;
+    final rows = resumen?.ultimasFacturas ?? const <DashboardFacturaItem>[];
     return _DashboardCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,18 +601,24 @@ class _RecentInvoicesCard extends StatelessWidget {
             actionLabel: 'Ver todo',
           ),
           const SizedBox(height: defaultPadding),
-          Table(
-            columnWidths: const {
-              0: FlexColumnWidth(2.2),
-              1: FlexColumnWidth(1.2),
-              2: FlexColumnWidth(1.2),
-            },
-            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-            children: [
-              _buildTableHeader(context, ['Numero', 'Monto', 'Estado']),
-              for (final row in rows) _buildInvoiceRow(context, row),
-            ],
-          ),
+          if (rows.isEmpty)
+            Text(
+              'Sin facturas recientes.',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          else
+            Table(
+              columnWidths: const {
+                0: FlexColumnWidth(2.2),
+                1: FlexColumnWidth(1.2),
+                2: FlexColumnWidth(1.2),
+              },
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              children: [
+                _buildTableHeader(context, ['Numero', 'Monto', 'Estado']),
+                for (final row in rows) _buildInvoiceRow(context, row),
+              ],
+            ),
         ],
       ),
     );
@@ -500,27 +641,28 @@ class _RecentInvoicesCard extends StatelessWidget {
     );
   }
 
-  TableRow _buildInvoiceRow(BuildContext context, _InvoiceRowData row) {
+  TableRow _buildInvoiceRow(BuildContext context, DashboardFacturaItem row) {
+    final statusColor = _resolveStatusColor(row.estado);
     return TableRow(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Text(
-            row.numero,
+            row.numero ?? '-',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Text(row.monto),
+          child: Text(_formatMoney(row.total)),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Align(
             alignment: Alignment.centerLeft,
             child: _StatusChip(
-              label: row.estado,
-              color: row.color,
+              label: row.estado ?? '-',
+              color: statusColor,
             ),
           ),
         ),
@@ -530,11 +672,14 @@ class _RecentInvoicesCard extends StatelessWidget {
 }
 
 class _TopProductsCard extends StatelessWidget {
-  const _TopProductsCard();
+  const _TopProductsCard({required this.resumen});
+
+  final DashboardResumen? resumen;
 
   @override
   Widget build(BuildContext context) {
-    final rows = _ProductRowData.samples;
+    final rows = resumen?.productosMasVendidos ??
+        const <DashboardProductoVentaItem>[];
     return _DashboardCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,7 +689,13 @@ class _TopProductsCard extends StatelessWidget {
             actionLabel: 'Detalle',
           ),
           const SizedBox(height: defaultPadding),
-          for (final row in rows) _ProductRow(row: row),
+          if (rows.isEmpty)
+            Text(
+              'Sin datos de ventas.',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          else
+            for (final row in rows) _ProductRow(row: row),
         ],
       ),
     );
@@ -554,7 +705,7 @@ class _TopProductsCard extends StatelessWidget {
 class _ProductRow extends StatelessWidget {
   const _ProductRow({required this.row});
 
-  final _ProductRowData row;
+  final DashboardProductoVentaItem row;
 
   @override
   Widget build(BuildContext context) {
@@ -566,13 +717,13 @@ class _ProductRow extends StatelessWidget {
           Expanded(
             flex: 3,
             child: Text(
-              row.producto,
+              row.descripcion ?? '-',
               style: theme.textTheme.bodySmall,
             ),
           ),
           Expanded(
             child: Text(
-              row.cantidad,
+              _formatQuantity(row.cantidad),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withAlpha(150),
               ),
@@ -580,7 +731,7 @@ class _ProductRow extends StatelessWidget {
           ),
           Expanded(
             child: Text(
-              row.total,
+              _formatMoney(row.total),
               textAlign: TextAlign.right,
               style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w600,
@@ -589,6 +740,102 @@ class _ProductRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LowStockCard extends StatelessWidget {
+  const _LowStockCard({required this.resumen});
+
+  final DashboardResumen? resumen;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows =
+        resumen?.productosMenosStock ?? const <DashboardProductoStockItem>[];
+    return _DashboardCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardHeader(
+            title: 'Productos con menos stock',
+            actionLabel: 'Detalle',
+          ),
+          const SizedBox(height: defaultPadding),
+          _LowStockHeader(),
+          const SizedBox(height: 6),
+          if (rows.isEmpty)
+            Text(
+              'Sin productos en lista.',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          else
+            for (final row in rows) _LowStockRow(row: row),
+        ],
+      ),
+    );
+  }
+}
+
+class _LowStockRow extends StatelessWidget {
+  const _LowStockRow({required this.row});
+
+  final DashboardProductoStockItem row;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final actual = row.stockActual;
+    final minimo = row.stockMinimo;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              row.descripcion ?? '-',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              _formatQuantity(actual),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withAlpha(150),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              _formatQuantity(minimo),
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LowStockHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withAlpha(140),
+          fontWeight: FontWeight.w600,
+        );
+    return Row(
+      children: [
+        Expanded(flex: 3, child: Text('Producto', style: style)),
+        Expanded(child: Text('Actual', style: style)),
+        Expanded(
+          child: Text('Minimo', style: style, textAlign: TextAlign.right),
+        ),
+      ],
     );
   }
 }
@@ -683,27 +930,32 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _MiniLineChart extends StatelessWidget {
-  const _MiniLineChart();
+  const _MiniLineChart({required this.values});
+
+  final List<double> values;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final points = values.isEmpty
+        ? const [
+            1.2,
+            1.4,
+            1.3,
+            1.8,
+            1.6,
+            1.7,
+            2.1,
+            2.0,
+            2.4,
+            2.2,
+            2.6,
+            2.5,
+          ]
+        : values;
     return CustomPaint(
       painter: _LineChartPainter(
-        values: const [
-          1.2,
-          1.4,
-          1.3,
-          1.8,
-          1.6,
-          1.7,
-          2.1,
-          2.0,
-          2.4,
-          2.2,
-          2.6,
-          2.5,
-        ],
+        values: points,
         lineColor: theme.colorScheme.primary,
         fillColor: theme.colorScheme.primary.withAlpha(45),
         gridColor: theme.colorScheme.onSurface.withAlpha(20),
@@ -802,103 +1054,101 @@ class _DashboardStatData {
   final Color color;
   final bool isPositive;
 
-  static const List<_DashboardStatData> samples = [
-    _DashboardStatData(
-      title: 'Ventas del Mes',
-      value: '\$12,450.00',
-      caption: '+12% vs. mes anterior',
-      icon: Icons.trending_up,
-      color: Color(0xFF2ECC71),
-      isPositive: true,
-    ),
-    _DashboardStatData(
-      title: 'Cuentas por Cobrar',
-      value: '\$3,120.50',
-      caption: '8 pendientes hoy',
-      icon: Icons.account_balance_wallet_outlined,
-      color: Color(0xFFF5A524),
-      isPositive: true,
-    ),
-    _DashboardStatData(
-      title: 'Stock Critico',
-      value: '15',
-      caption: 'Necesitan reposicion',
-      icon: Icons.warning_amber_rounded,
-      color: Color(0xFFFF5A5F),
-      isPositive: false,
-    ),
-    _DashboardStatData(
-      title: 'Proveedores por Pagar',
-      value: '\$1,890.75',
-      caption: '3 vencen esta semana',
-      icon: Icons.inventory_2_outlined,
-      color: Color(0xFF7B61FF),
-      isPositive: true,
-    ),
-  ];
+  static List<_DashboardStatData> fromResumen(DashboardResumen? resumen) {
+    final ventasPct = resumen?.ventasVariacionPct;
+    final ventasCaption = ventasPct == null
+        ? 'Sin datos vs. mes anterior'
+        : '${ventasPct >= 0 ? '+' : ''}${ventasPct.toStringAsFixed(1)}% vs. mes anterior';
+    final pendientesHoy = resumen?.cuentasPorCobrarPendientesHoy;
+    final pendientesCaption = pendientesHoy == null
+        ? 'Sin datos hoy'
+        : '$pendientesHoy pendientes hoy';
+    final stockCritico = resumen?.stockCritico;
+    final proveedoresSemana = resumen?.proveedoresPorPagarVencenSemana;
+    final proveedoresCaption = proveedoresSemana == null
+        ? 'Sin datos esta semana'
+        : '$proveedoresSemana vencen esta semana';
+
+    return [
+      _DashboardStatData(
+        title: 'Ventas del Mes',
+        value: _formatMoney(resumen?.ventasMes),
+        caption: ventasCaption,
+        icon: Icons.trending_up,
+        color: const Color(0xFF2ECC71),
+        isPositive: (ventasPct ?? 0) >= 0,
+      ),
+      _DashboardStatData(
+        title: 'Cuentas por Cobrar',
+        value: _formatMoney(resumen?.cuentasPorCobrarTotal),
+        caption: pendientesCaption,
+        icon: Icons.account_balance_wallet_outlined,
+        color: const Color(0xFFF5A524),
+        isPositive: true,
+      ),
+      _DashboardStatData(
+        title: 'Stock Critico',
+        value: stockCritico?.toString() ?? '-',
+        caption: 'Necesitan reposición',
+        icon: Icons.warning_amber_rounded,
+        color: const Color(0xFFFF5A5F),
+        isPositive: (stockCritico ?? 0) == 0,
+      ),
+      _DashboardStatData(
+        title: 'Proveedores por Pagar',
+        value: _formatMoney(resumen?.proveedoresPorPagarTotal),
+        caption: proveedoresCaption,
+        icon: Icons.inventory_2_outlined,
+        color: const Color(0xFF7B61FF),
+        isPositive: true,
+      ),
+    ];
+  }
 }
 
-class _InvoiceRowData {
-  const _InvoiceRowData({
-    required this.numero,
-    required this.monto,
-    required this.estado,
-    required this.color,
-  });
-
-  final String numero;
-  final String monto;
-  final String estado;
-  final Color color;
-
-  static const List<_InvoiceRowData> samples = [
-    _InvoiceRowData(
-      numero: '001-001-000000843',
-      monto: '\$260.00',
-      estado: 'SRI Autorizado',
-      color: Color(0xFF2ECC71),
-    ),
-    _InvoiceRowData(
-      numero: '001-001-000000842',
-      monto: '\$180.30',
-      estado: 'Pendiente',
-      color: Color(0xFFF5A524),
-    ),
-    _InvoiceRowData(
-      numero: '001-001-000000841',
-      monto: '\$150.00',
-      estado: 'Rechazada',
-      color: Color(0xFFFF5A5F),
-    ),
-  ];
+List<double> _resolveCashflowValues(DashboardResumen? resumen) {
+  final cashflow = resumen?.flujoCaja30Dias ?? const [];
+  if (cashflow.isEmpty) {
+    return const [];
+  }
+  return cashflow
+      .map((item) => item.neto ?? item.ingresos ?? 0)
+      .toList();
 }
 
-class _ProductRowData {
-  const _ProductRowData({
-    required this.producto,
-    required this.cantidad,
-    required this.total,
-  });
+String _formatMoney(double? value) {
+  if (value == null) {
+    return '-';
+  }
+  return '\$${value.toStringAsFixed(2)}';
+}
 
-  final String producto;
-  final String cantidad;
-  final String total;
+String _formatQuantity(double? value) {
+  if (value == null) {
+    return '-';
+  }
+  if (value % 1 == 0) {
+    return value.toStringAsFixed(0);
+  }
+  return value.toStringAsFixed(2);
+}
 
-  static const List<_ProductRowData> samples = [
-    _ProductRowData(
-      producto: 'Registro Office',
-      cantidad: '10.6k',
-      total: '\$2,950.00',
-    ),
-    _ProductRowData(
-      producto: 'Candener Pago',
-      cantidad: '9.3k',
-      total: '\$2,180.00',
-    ),
-    _ProductRowData(
-      producto: 'Helados Ventos',
-      cantidad: '5.1k',
-      total: '\$1,950.00',
-    ),
-  ];
+Color _resolveStatusColor(String? estado) {
+  final normalized = estado?.toLowerCase() ?? '';
+  if (normalized.contains('autoriz') ||
+      normalized.contains('cobr') ||
+      normalized.contains('emitida')) {
+    return const Color(0xFF2ECC71);
+  }
+  if (normalized.contains('parcial') ||
+      normalized.contains('pendiente') ||
+      normalized.contains('proceso')) {
+    return const Color(0xFFF5A524);
+  }
+  if (normalized.contains('rech') ||
+      normalized.contains('error') ||
+      normalized.contains('anulada')) {
+    return const Color(0xFFFF5A5F);
+  }
+  return const Color(0xFF7B61FF);
 }
