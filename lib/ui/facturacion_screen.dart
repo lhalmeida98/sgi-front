@@ -82,6 +82,10 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
   late final PreordenesProvider _preordenesProvider;
   bool _empresaPrefillDone = false;
   bool _bodegaPrefillDone = false;
+  bool _loadingPreorden = false;
+  bool _preordenReservaInventario = false;
+  int? _preordenLoadedId;
+  final Map<String, double> _preordenReservaPorKey = {};
   int _codigoNumericoSecuencia = 0;
 
   @override
@@ -104,6 +108,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     _bodegasProvider.fetchBodegas();
     _inventariosProvider.clearProductosDisponibles();
     _setNextCodigoNumerico();
+    _preordenIdController.addListener(_onPreordenIdChanged);
   }
 
   @override
@@ -119,12 +124,29 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     _dirEstablecimientoController.dispose();
     _codigoNumericoController.dispose();
     _observacionesController.dispose();
+    _preordenIdController.removeListener(_onPreordenIdChanged);
     _preordenIdController.dispose();
     _clienteEmailController.dispose();
     _clienteDireccionController.dispose();
     _facturaIdController.dispose();
     super.dispose();
   }
+
+  void _onPreordenIdChanged() {
+    if (_preordenLoadedId == null) {
+      return;
+    }
+    final current = int.tryParse(_preordenIdController.text.trim());
+    if (current != _preordenLoadedId) {
+      setState(() {
+        _preordenLoadedId = null;
+        _preordenReservaInventario = false;
+        _preordenReservaPorKey.clear();
+      });
+    }
+  }
+
+  String _stockKey(int productoId, int bodegaId) => '$productoId@$bodegaId';
 
   @override
   void didChangeDependencies() {
@@ -347,6 +369,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                       clienteDireccionController: _clienteDireccionController,
                       items: _items,
                       pagos: _pagos,
+                      isLoadingPreorden: _loadingPreorden,
+                      onBuscarPreorden: () => _buscarPreorden(context),
                       onEmpresaChanged: (value) {
                         setState(() {
                           _empresaId = value;
@@ -545,6 +569,14 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
       if (productoId == null || bodegaId == null) {
         continue;
       }
+      var requiredQty = entry.value;
+      if (_preordenReservaInventario) {
+        final reserved = _preordenReservaPorKey[entry.key] ?? 0;
+        if (reserved >= requiredQty) {
+          continue;
+        }
+        requiredQty -= reserved;
+      }
       var disponible = _inventariosProvider.getDisponible(
         productoId,
         bodegaId,
@@ -554,7 +586,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         productoId: productoId,
       );
       final stockDisponible = disponible?.stockDisponible ?? 0;
-      if (stockDisponible < entry.value) {
+      if (stockDisponible < requiredQty) {
         showAppToast(
           providerContext,
           'Stock insuficiente para uno o mas items.',
@@ -774,6 +806,172 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
       return;
     }
     showAppToast(providerContext, 'Preorden guardada.');
+  }
+
+  Future<void> _buscarPreorden(BuildContext providerContext) async {
+    if (_loadingPreorden) {
+      return;
+    }
+    final raw = _preordenIdController.text.trim();
+    if (raw.isEmpty) {
+      showAppToast(
+        providerContext,
+        'Ingresa el ID de la preorden.',
+        isError: true,
+      );
+      return;
+    }
+    final preordenId = int.tryParse(raw);
+    if (preordenId == null) {
+      showAppToast(
+        providerContext,
+        'ID de preorden invalido.',
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _loadingPreorden = true);
+    showFacturaProcessingDialog(
+      context: providerContext,
+      title: 'Buscando preorden...',
+      message: 'Estamos cargando los datos de la preorden.',
+    );
+
+    try {
+      if (_preordenesProvider.preordenes.isEmpty) {
+        await _preordenesProvider.fetchPreordenes();
+      }
+      Preorden? preorden;
+      for (final item in _preordenesProvider.preordenes) {
+        if (item.id == preordenId) {
+          preorden = item;
+          break;
+        }
+      }
+      if (preorden == null) {
+        if (providerContext.mounted) {
+          Navigator.of(providerContext).pop();
+        }
+        showAppToast(
+          providerContext,
+          'Preorden no encontrada.',
+          isError: true,
+        );
+        if (mounted) {
+          setState(() {
+            _preordenReservaInventario = false;
+            _preordenLoadedId = null;
+            _preordenReservaPorKey.clear();
+          });
+        }
+        return;
+      }
+
+      final preordenResolved = preorden!;
+      final empresaId = preordenResolved.empresaId;
+      final clienteId = preordenResolved.clienteId;
+      final items = preordenResolved.items
+          .map(
+            (item) => _FacturaItemDraft(
+              cantidad: item.cantidad.round() <= 0 ? 1 : item.cantidad.round(),
+              descuento: item.descuento,
+              productoId: item.productoId,
+              bodegaId: item.bodegaId,
+            ),
+          )
+          .toList();
+      final fallbackBodegaId = items
+          .map((item) => item.bodegaId)
+          .whereType<int>()
+          .firstWhere(
+            (_) => true,
+            orElse: () => _bodegaId ?? 0,
+          );
+      final resolvedBodegaId = fallbackBodegaId == 0 ? null : fallbackBodegaId;
+      final reservaKeys = <String, double>{};
+      if (preordenResolved.reservaInventario) {
+        for (final item in preordenResolved.items) {
+          final bodegaId = item.bodegaId ?? resolvedBodegaId;
+          if (bodegaId == null || item.productoId == 0) {
+            continue;
+          }
+          final key = _stockKey(item.productoId, bodegaId);
+          reservaKeys[key] = (reservaKeys[key] ?? 0) + item.cantidad;
+        }
+      }
+
+      setState(() {
+        _empresaId = empresaId;
+        _empresaIdProceso = empresaId;
+        _clienteId = clienteId;
+        _moneda = preordenResolved.moneda.isNotEmpty
+            ? preordenResolved.moneda
+            : _moneda;
+        _dirEstablecimientoController.text =
+            preordenResolved.dirEstablecimiento;
+        _observacionesController.text = preordenResolved.observaciones;
+        _items
+          ..clear()
+          ..addAll(items.isEmpty
+              ? [
+                  _FacturaItemDraft(
+                    cantidad: 1,
+                    descuento: 0,
+                    bodegaId: resolvedBodegaId,
+                  ),
+                ]
+              : items);
+        _bodegaId = resolvedBodegaId;
+        _bodegaPrefillDone = resolvedBodegaId != null;
+        for (final item in _items) {
+          item.bodegaId ??= resolvedBodegaId;
+        }
+        _preordenReservaInventario = preordenResolved.reservaInventario;
+        _preordenLoadedId = preordenId;
+        _preordenReservaPorKey
+          ..clear()
+          ..addAll(reservaKeys);
+
+        final cliente = _clientesProvider.clientes.firstWhere(
+          (item) => item.id == clienteId,
+          orElse: () => Cliente(
+            id: clienteId,
+            tipoIdentificacion: '',
+            identificacion: '',
+            razonSocial: '',
+            email: '',
+            direccion: '',
+          ),
+        );
+        _clienteEmailController.text = cliente.email;
+        _clienteDireccionController.text = cliente.direccion;
+      });
+
+      if (resolvedBodegaId != null) {
+        _inventariosProvider.fetchProductosDisponibles(resolvedBodegaId);
+      } else {
+        _inventariosProvider.clearProductosDisponibles();
+      }
+
+      if (providerContext.mounted) {
+        Navigator.of(providerContext).pop();
+        showAppToast(providerContext, 'Preorden cargada.');
+      }
+    } catch (error) {
+      if (providerContext.mounted) {
+        Navigator.of(providerContext).pop();
+      }
+      showAppToast(
+        providerContext,
+        _preordenesProvider.errorMessage ?? error.toString(),
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingPreorden = false);
+      }
+    }
   }
 
   void _resetFacturaForm() {
@@ -1451,6 +1649,8 @@ class _FacturarView extends StatelessWidget {
     required this.clienteDireccionController,
     required this.items,
     required this.pagos,
+    required this.isLoadingPreorden,
+    required this.onBuscarPreorden,
     required this.onEmpresaChanged,
     required this.onBodegaChanged,
     required this.onClienteChanged,
@@ -1483,6 +1683,8 @@ class _FacturarView extends StatelessWidget {
   final TextEditingController clienteDireccionController;
   final List<_FacturaItemDraft> items;
   final List<_PagoDraft> pagos;
+  final bool isLoadingPreorden;
+  final VoidCallback onBuscarPreorden;
   final ValueChanged<int?> onEmpresaChanged;
   final ValueChanged<int?> onBodegaChanged;
   final ValueChanged<int?> onClienteChanged;
@@ -1530,6 +1732,8 @@ class _FacturarView extends StatelessWidget {
                 preordenIdController: preordenIdController,
                 clienteEmailController: clienteEmailController,
                 clienteDireccionController: clienteDireccionController,
+                isLoadingPreorden: isLoadingPreorden,
+                onBuscarPreorden: onBuscarPreorden,
                 onEmpresaChanged: onEmpresaChanged,
                 onBodegaChanged: onBodegaChanged,
                 onClienteChanged: onClienteChanged,
@@ -1566,6 +1770,8 @@ class _FacturarView extends StatelessWidget {
                   preordenIdController: preordenIdController,
                   clienteEmailController: clienteEmailController,
                   clienteDireccionController: clienteDireccionController,
+                  isLoadingPreorden: isLoadingPreorden,
+                  onBuscarPreorden: onBuscarPreorden,
                   onEmpresaChanged: onEmpresaChanged,
                   onBodegaChanged: onBodegaChanged,
                   onClienteChanged: onClienteChanged,
@@ -1606,6 +1812,8 @@ class _FacturarView extends StatelessWidget {
                   preordenIdController: preordenIdController,
                   clienteEmailController: clienteEmailController,
                   clienteDireccionController: clienteDireccionController,
+                  isLoadingPreorden: isLoadingPreorden,
+                  onBuscarPreorden: onBuscarPreorden,
                   onEmpresaChanged: onEmpresaChanged,
                   onBodegaChanged: onBodegaChanged,
                   onClienteChanged: onClienteChanged,
@@ -1669,6 +1877,8 @@ class _FacturaDatosCard extends StatelessWidget {
     required this.preordenIdController,
     required this.clienteEmailController,
     required this.clienteDireccionController,
+    required this.isLoadingPreorden,
+    required this.onBuscarPreorden,
     required this.onEmpresaChanged,
     required this.onBodegaChanged,
     required this.onClienteChanged,
@@ -1692,6 +1902,8 @@ class _FacturaDatosCard extends StatelessWidget {
   final TextEditingController preordenIdController;
   final TextEditingController clienteEmailController;
   final TextEditingController clienteDireccionController;
+  final bool isLoadingPreorden;
+  final VoidCallback onBuscarPreorden;
   final ValueChanged<int?> onEmpresaChanged;
   final ValueChanged<int?> onBodegaChanged;
   final ValueChanged<int?> onClienteChanged;
@@ -1882,9 +2094,24 @@ class _FacturaDatosCard extends StatelessWidget {
                   TextFormField(
                     controller: preordenIdController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Preorden ID (opcional)',
+                      suffixIcon: isLoadingPreorden
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : IconButton(
+                              tooltip: 'Cargar preorden',
+                              onPressed: onBuscarPreorden,
+                              icon: const Icon(Icons.search),
+                            ),
                     ),
+                    onFieldSubmitted: (_) => onBuscarPreorden(),
                   ),
                   const SizedBox(height: defaultPadding / 2),
                   TextFormField(
