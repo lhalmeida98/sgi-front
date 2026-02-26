@@ -68,8 +68,8 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
                         categoria.empresaId == empresaId,
                   )
                   .toList();
-          final errorMessage = categoriasProvider.errorMessage ??
-              empresasProvider.errorMessage;
+          final errorMessage =
+              categoriasProvider.errorMessage ?? empresasProvider.errorMessage;
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(defaultPadding),
@@ -180,12 +180,17 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
                       if (empresas.isNotEmpty)
                         canSelectEmpresa
                             ? DropdownButtonFormField<int>(
+                                isExpanded: true,
                                 value: empresaId,
                                 items: empresas
                                     .map(
                                       (empresa) => DropdownMenuItem(
                                         value: empresa.id,
-                                        child: Text(empresa.razonSocial),
+                                        child: Text(
+                                          empresa.razonSocial,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     )
                                     .toList(),
@@ -251,8 +256,7 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
                 if (!mounted) {
                   return;
                 }
-                final provider =
-                    providerContext.read<CategoriasProvider>();
+                final provider = providerContext.read<CategoriasProvider>();
                 final payload = Categoria(
                   id: categoria?.id,
                   empresaId: empresaId,
@@ -265,8 +269,7 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
                 if (!ok) {
                   showAppToast(
                     providerContext,
-                    provider.errorMessage ??
-                        'No se pudo guardar la categoria.',
+                    provider.errorMessage ?? 'No se pudo guardar la categoria.',
                     isError: true,
                   );
                   return;
@@ -275,9 +278,7 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
                   Navigator.of(context).pop();
                   showAppToast(
                     providerContext,
-                    isEditing
-                        ? 'Categoria actualizada.'
-                        : 'Categoria creada.',
+                    isEditing ? 'Categoria actualizada.' : 'Categoria creada.',
                   );
                 }
               },
@@ -416,9 +417,9 @@ class _EmpresaCategoriaGroup extends StatelessWidget {
                 child: Text(
                   '${categorias.length} categorias',
                   style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],

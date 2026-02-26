@@ -153,13 +153,12 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                     ),
                     onViewEmpresas: (usuario) =>
                         _openEmpresasDialog(context, usuario),
-                    onEdit: (usuario) =>
-                        _openUsuarioDialog(
-                          context,
-                          usuario: usuario,
-                          roles: rolesProvider.roles,
-                          empresas: empresasProvider.empresas,
-                        ),
+                    onEdit: (usuario) => _openUsuarioDialog(
+                      context,
+                      usuario: usuario,
+                      roles: rolesProvider.roles,
+                      empresas: empresasProvider.empresas,
+                    ),
                     onDelete: (usuario) =>
                         _confirmDeleteUsuario(context, usuario),
                   ),
@@ -185,12 +184,9 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
         TextEditingController(text: usuario?.usuario ?? '');
     final emailController = TextEditingController(text: usuario?.email ?? '');
     final passwordController = TextEditingController();
-    final roleNames =
-        roles.map((item) => item.nombre.toUpperCase()).toList();
-    final initialRoles = usuario?.roles
-            .map((role) => role.toUpperCase())
-            .toSet() ??
-        {};
+    final roleNames = roles.map((item) => item.nombre.toUpperCase()).toList();
+    final initialRoles =
+        usuario?.roles.map((role) => role.toUpperCase()).toSet() ?? {};
     final availableRolesSet = <String>{
       ...roleNames.map((role) => role.toUpperCase()),
       ...initialRoles,
@@ -220,9 +216,9 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
       }
     }
     if (selectedEmpresaIds.isEmpty && empresas.isNotEmpty) {
-      final firstId =
-          empresas.firstWhere((e) => e.id != null, orElse: () => empresas.first)
-              .id;
+      final firstId = empresas
+          .firstWhere((e) => e.id != null, orElse: () => empresas.first)
+          .id;
       if (firstId != null) {
         selectedEmpresaIds.add(firstId);
         principalEmpresaId = firstId;
@@ -355,9 +351,8 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                                     .map(
                                       (role) => FilterChip(
                                         label: Text(role),
-                                        selected:
-                                            state.value?.contains(role) ??
-                                                false,
+                                        selected: state.value?.contains(role) ??
+                                            false,
                                         onSelected: (selected) {
                                           final updated = Set<String>.from(
                                             state.value ?? {},
@@ -396,6 +391,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                                       children: [
                                         Expanded(
                                           child: DropdownButtonFormField<int>(
+                                            isExpanded: true,
                                             value: empresaSeleccionadaId,
                                             decoration: const InputDecoration(
                                               labelText: 'Agregar empresa',
@@ -403,8 +399,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                                             items: empresas
                                                 .where((e) => e.id != null)
                                                 .map(
-                                                  (empresa) =>
-                                                      DropdownMenuItem(
+                                                  (empresa) => DropdownMenuItem(
                                                     value: empresa.id,
                                                     child: Text(
                                                       empresa.nombreComercial
@@ -412,6 +407,9 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                                                           ? empresa
                                                               .nombreComercial
                                                           : empresa.razonSocial,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                 )
@@ -444,6 +442,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                                   : Column(
                                       children: [
                                         DropdownButtonFormField<int>(
+                                          isExpanded: true,
                                           value: empresaSeleccionadaId,
                                           decoration: const InputDecoration(
                                             labelText: 'Agregar empresa',
@@ -459,6 +458,9 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                                                         ? empresa
                                                             .nombreComercial
                                                         : empresa.razonSocial,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                 ),
                                               )
@@ -475,19 +477,18 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                                         SizedBox(
                                           width: double.infinity,
                                           child: FilledButton.tonal(
-                                            onPressed:
-                                                empresaSeleccionadaId == null
-                                                    ? null
-                                                    : () {
-                                                        safeSetState(() {
-                                                          selectedEmpresaIds
-                                                              .add(
-                                                            empresaSeleccionadaId!,
-                                                          );
-                                                          principalEmpresaId ??=
-                                                              empresaSeleccionadaId;
-                                                        });
-                                                      },
+                                            onPressed: empresaSeleccionadaId ==
+                                                    null
+                                                ? null
+                                                : () {
+                                                    safeSetState(() {
+                                                      selectedEmpresaIds.add(
+                                                        empresaSeleccionadaId!,
+                                                      );
+                                                      principalEmpresaId ??=
+                                                          empresaSeleccionadaId;
+                                                    });
+                                                  },
                                             child: const Text('Agregar'),
                                           ),
                                         ),
@@ -497,21 +498,19 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                               if (selectedEmpresaIds.isEmpty)
                                 Text(
                                   'Selecciona al menos una empresa.',
-                                  style:
-                                      Theme.of(context).textTheme.bodySmall,
+                                  style: Theme.of(context).textTheme.bodySmall,
                                 )
                               else
                                 Column(
-                                  children:
-                                      selectedEmpresaIds.map((empresaId) {
+                                  children: selectedEmpresaIds.map((empresaId) {
                                     final empresa = empresas.firstWhere(
                                       (item) => item.id == empresaId,
                                       orElse: () => empresas.first,
                                     );
-                                    final label = empresa.nombreComercial
-                                            .isNotEmpty
-                                        ? empresa.nombreComercial
-                                        : empresa.razonSocial;
+                                    final label =
+                                        empresa.nombreComercial.isNotEmpty
+                                            ? empresa.nombreComercial
+                                            : empresa.razonSocial;
                                     return Container(
                                       margin: const EdgeInsets.only(
                                         bottom: defaultPadding / 2,
@@ -539,7 +538,8 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                                             groupValue: principalEmpresaId,
                                             onChanged: (value) {
                                               safeSetState(
-                                                () => principalEmpresaId = value,
+                                                () =>
+                                                    principalEmpresaId = value,
                                               );
                                             },
                                           ),
@@ -592,8 +592,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                                 ),
                                 validator: (value) {
                                   if (!isEditing &&
-                                      (value == null ||
-                                          value.trim().isEmpty)) {
+                                      (value == null || value.trim().isEmpty)) {
                                     return 'Campo requerido';
                                   }
                                   if (value != null && value.isNotEmpty) {
@@ -635,8 +634,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                 if (!formKey.currentState!.validate()) {
                   return;
                 }
-                final selectedRoles =
-                    rolesFieldKey.currentState?.value ?? {};
+                final selectedRoles = rolesFieldKey.currentState?.value ?? {};
                 if (selectedRoles.isEmpty) {
                   rolesFieldKey.currentState?.validate();
                   return;
@@ -661,8 +659,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                       ),
                     )
                     .toList();
-                final provider =
-                    providerContext.read<UsuariosProvider>();
+                final provider = providerContext.read<UsuariosProvider>();
                 final payload = Usuario(
                   id: usuario?.id,
                   nombre: nombreController.text.trim(),
@@ -760,8 +757,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                           item.principal ? Icons.star : Icons.business,
                         ),
                         title: Text(label),
-                        subtitle:
-                            ruc.isEmpty ? null : Text('RUC: $ruc'),
+                        subtitle: ruc.isEmpty ? null : Text('RUC: $ruc'),
                         trailing:
                             item.principal ? const Text('Principal') : null,
                       );
@@ -932,70 +928,69 @@ class _UsuariosList extends StatelessWidget {
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: const BorderRadius.all(Radius.circular(10)),
               ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('Id')),
-                      DataColumn(label: Text('Usuario')),
-                      DataColumn(label: Text('Autorizar correo')),
-                      DataColumn(label: Text('Roles')),
-                      DataColumn(label: Text('Correo')),
-                      DataColumn(label: Text('Telefono')),
-                      DataColumn(label: Text('Estado')),
-                      DataColumn(label: Text('Acciones')),
-                    ],
-                    rows: usuarios
-                        .map(
-                          (usuario) => DataRow(
-                            cells: [
-                              DataCell(Text(usuario.id?.toString() ?? '-')),
-                              DataCell(Text(usuario.usuario)),
-                              DataCell(
-                                _StatusBadge(
-                                  value: usuario.autorizaCorreo,
-                                  activeLabel: 'ACTIVO',
-                                  inactiveLabel: 'INACTIVO',
-                                  nullLabel: 'N/A',
-                                ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: const [
+                    DataColumn(label: Text('Id')),
+                    DataColumn(label: Text('Usuario')),
+                    DataColumn(label: Text('Autorizar correo')),
+                    DataColumn(label: Text('Roles')),
+                    DataColumn(label: Text('Correo')),
+                    DataColumn(label: Text('Telefono')),
+                    DataColumn(label: Text('Estado')),
+                    DataColumn(label: Text('Acciones')),
+                  ],
+                  rows: usuarios
+                      .map(
+                        (usuario) => DataRow(
+                          cells: [
+                            DataCell(Text(usuario.id?.toString() ?? '-')),
+                            DataCell(Text(usuario.usuario)),
+                            DataCell(
+                              _StatusBadge(
+                                value: usuario.autorizaCorreo,
+                                activeLabel: 'ACTIVO',
+                                inactiveLabel: 'INACTIVO',
+                                nullLabel: 'N/A',
                               ),
-                              DataCell(
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
-                                  children: usuario.roles.isEmpty
-                                      ? [
-                                          const Text('-'),
-                                        ]
-                                      : usuario.roles
-                                          .map((rol) => _RoleBadge(label: rol))
-                                          .toList(),
-                                ),
+                            ),
+                            DataCell(
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: usuario.roles.isEmpty
+                                    ? [
+                                        const Text('-'),
+                                      ]
+                                    : usuario.roles
+                                        .map((rol) => _RoleBadge(label: rol))
+                                        .toList(),
                               ),
-                              DataCell(Text(usuario.email)),
-                              DataCell(Text(usuario.telefono ?? '-')),
-                              DataCell(_StatusBadge(value: usuario.activo)),
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _ActionButton(
-                                      icon: Icons.business_outlined,
-                                      onPressed: () =>
-                                          onViewEmpresas(usuario),
-                                    ),
-                                    _ActionButton(
-                                      icon: Icons.edit_outlined,
-                                      onPressed: () => onEdit(usuario),
-                                    ),
-                                    _ActionButton(
-                                      icon: Icons.delete_outline,
-                                      onPressed: () => onDelete(usuario),
-                                      isDestructive: true,
-                                    ),
-                                  ],
-                                ),
+                            ),
+                            DataCell(Text(usuario.email)),
+                            DataCell(Text(usuario.telefono ?? '-')),
+                            DataCell(_StatusBadge(value: usuario.activo)),
+                            DataCell(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _ActionButton(
+                                    icon: Icons.business_outlined,
+                                    onPressed: () => onViewEmpresas(usuario),
+                                  ),
+                                  _ActionButton(
+                                    icon: Icons.edit_outlined,
+                                    onPressed: () => onEdit(usuario),
+                                  ),
+                                  _ActionButton(
+                                    icon: Icons.delete_outline,
+                                    onPressed: () => onDelete(usuario),
+                                    isDestructive: true,
+                                  ),
+                                ],
                               ),
+                            ),
                           ],
                         ),
                       )

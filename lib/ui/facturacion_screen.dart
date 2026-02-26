@@ -218,17 +218,18 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
               : bodegasProvider.bodegas
                   .where(
                     (bodega) =>
-                        bodega.empresaId == null || bodega.empresaId == empresaId,
+                        bodega.empresaId == null ||
+                        bodega.empresaId == empresaId,
                   )
                   .toList();
-          final productosDisponibles =
-              inventariosProvider.productosDisponibles;
+          final productosDisponibles = inventariosProvider.productosDisponibles;
           final vendibleIds = productosVendibles
               .where((producto) => producto.id != null)
               .map((producto) => producto.id!)
               .toSet();
           final productosDisponiblesVendibles = productosDisponibles
-              .where((disponible) => vendibleIds.contains(disponible.productoId))
+              .where(
+                  (disponible) => vendibleIds.contains(disponible.productoId))
               .toList();
           final disponiblesBodegaId =
               inventariosProvider.productosDisponiblesBodegaId;
@@ -361,7 +362,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                       bodegaId: _bodegaId,
                       moneda: _moneda,
                       fechaEmision: _fechaEmision,
-                      dirEstablecimientoController: _dirEstablecimientoController,
+                      dirEstablecimientoController:
+                          _dirEstablecimientoController,
                       codigoNumericoController: _codigoNumericoController,
                       observacionesController: _observacionesController,
                       preordenIdController: _preordenIdController,
@@ -394,7 +396,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                               secuencial: '',
                             ),
                           );
-                          _dirEstablecimientoController.text = empresa.dirMatriz;
+                          _dirEstablecimientoController.text =
+                              empresa.dirMatriz;
                         });
                         _inventariosProvider.clearProductosDisponibles();
                       },
@@ -631,8 +634,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
       if (!ok) {
         showAppToast(
           providerContext,
-          _clientesProvider.errorMessage ??
-              'No se pudo actualizar el cliente.',
+          _clientesProvider.errorMessage ?? 'No se pudo actualizar el cliente.',
           isError: true,
         );
         return;
@@ -646,7 +648,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         : _productosProvider.productos
             .where(
               (producto) =>
-                  producto.empresaId == null || producto.empresaId == _empresaId,
+                  producto.empresaId == null ||
+                  producto.empresaId == _empresaId,
             )
             .toList();
     final impuestos = _empresaId == null
@@ -654,7 +657,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         : _impuestosProvider.impuestos
             .where(
               (impuesto) =>
-                  impuesto.empresaId == null || impuesto.empresaId == _empresaId,
+                  impuesto.empresaId == null ||
+                  impuesto.empresaId == _empresaId,
             )
             .toList();
     final totals = _FacturacionTotals.fromData(_items, productos, impuestos);
@@ -710,8 +714,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
 
     final estado = _normalizeEstado(factura.estado);
     if (_isEnProceso(estado)) {
-      final actual =
-          await _facturasProvider.fetchEnProcesoFactura(factura.id!);
+      final actual = await _facturasProvider.fetchEnProcesoFactura(factura.id!);
       if (!providerContext.mounted) {
         return;
       }
@@ -738,7 +741,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     _resetFacturaForm();
   }
 
-  Future<void> _guardarPreordenDesdeFactura(BuildContext providerContext) async {
+  Future<void> _guardarPreordenDesdeFactura(
+      BuildContext providerContext) async {
     if (_empresaId == null || _clienteId == null) {
       showAppToast(
         providerContext,
@@ -799,8 +803,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     if (!ok) {
       showAppToast(
         providerContext,
-        _preordenesProvider.errorMessage ??
-            'No se pudo guardar la preorden.',
+        _preordenesProvider.errorMessage ?? 'No se pudo guardar la preorden.',
         isError: true,
       );
       return;
@@ -881,13 +884,11 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
             ),
           )
           .toList();
-      final fallbackBodegaId = items
-          .map((item) => item.bodegaId)
-          .whereType<int>()
-          .firstWhere(
-            (_) => true,
-            orElse: () => _bodegaId ?? 0,
-          );
+      final fallbackBodegaId =
+          items.map((item) => item.bodegaId).whereType<int>().firstWhere(
+                (_) => true,
+                orElse: () => _bodegaId ?? 0,
+              );
       final resolvedBodegaId = fallbackBodegaId == 0 ? null : fallbackBodegaId;
       final reservaKeys = <String, double>{};
       if (preordenResolved.reservaInventario) {
@@ -1083,8 +1084,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         _codigoNumericoSecuencia = Random().nextInt(99999999) + 1;
       }
     } else {
-      _codigoNumericoSecuencia =
-          (_codigoNumericoSecuencia + 1) % 100000000;
+      _codigoNumericoSecuencia = (_codigoNumericoSecuencia + 1) % 100000000;
       if (_codigoNumericoSecuencia == 0) {
         _codigoNumericoSecuencia = 1;
       }
@@ -1696,18 +1696,17 @@ class _FacturarView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedCliente = clientes
-        .firstWhere(
-          (cliente) => cliente.id == clienteId,
-          orElse: () => Cliente(
-            id: 0,
-            tipoIdentificacion: '- ',
-            identificacion: '-',
-            razonSocial: 'Selecciona cliente',
-            email: '-',
-            direccion: '-',
-          ),
-        );
+    final selectedCliente = clientes.firstWhere(
+      (cliente) => cliente.id == clienteId,
+      orElse: () => Cliente(
+        id: 0,
+        tipoIdentificacion: '- ',
+        identificacion: '-',
+        razonSocial: 'Selecciona cliente',
+        email: '-',
+        direccion: '-',
+      ),
+    );
     final totals = _FacturacionTotals.fromData(items, productos, impuestos);
 
     return Column(
@@ -1941,12 +1940,17 @@ class _FacturaDatosCard extends StatelessWidget {
                   const SizedBox(height: defaultPadding),
                   canSelectEmpresa
                       ? DropdownButtonFormField<int>(
+                          isExpanded: true,
                           value: empresaId,
                           items: empresas
                               .map(
                                 (empresa) => DropdownMenuItem(
                                   value: empresa.id,
-                                  child: Text(empresa.razonSocial),
+                                  child: Text(
+                                    empresa.razonSocial,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -1980,12 +1984,17 @@ class _FacturaDatosCard extends StatelessWidget {
                         ),
                   const SizedBox(height: defaultPadding / 2),
                   DropdownButtonFormField<int>(
+                    isExpanded: true,
                     value: clienteId,
                     items: clientes
                         .map(
                           (cliente) => DropdownMenuItem(
                             value: cliente.id,
-                            child: Text(cliente.razonSocial),
+                            child: Text(
+                              cliente.razonSocial,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(),
@@ -2033,13 +2042,14 @@ class _FacturaDatosCard extends StatelessWidget {
                         child: TextFormField(
                           controller: codigoNumericoController,
                           readOnly: true,
-                          decoration:
-                              const InputDecoration(labelText: 'Codigo numerico'),
+                          decoration: const InputDecoration(
+                              labelText: 'Codigo numerico'),
                         ),
                       ),
                       const SizedBox(width: defaultPadding / 2),
                       Expanded(
                         child: DropdownButtonFormField<String>(
+                          isExpanded: true,
                           value: moneda,
                           items: const [
                             DropdownMenuItem(value: 'USD', child: Text('USD')),
@@ -2050,7 +2060,8 @@ class _FacturaDatosCard extends StatelessWidget {
                               onMonedaChanged(value);
                             }
                           },
-                          decoration: const InputDecoration(labelText: 'Moneda'),
+                          decoration:
+                              const InputDecoration(labelText: 'Moneda'),
                         ),
                       ),
                     ],
@@ -2072,18 +2083,22 @@ class _FacturaDatosCard extends StatelessWidget {
                       const SizedBox(width: defaultPadding / 2),
                       Expanded(
                         child: DropdownButtonFormField<int>(
+                          isExpanded: true,
                           value: selectedBodegaId,
                           items: availableBodegas
                               .map(
                                 (bodega) => DropdownMenuItem(
                                   value: bodega.id,
-                                  child: Text(bodega.nombre),
+                                  child: Text(
+                                    bodega.nombre,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               )
                               .toList(),
-                          onChanged: availableBodegas.isEmpty
-                              ? null
-                              : onBodegaChanged,
+                          onChanged:
+                              availableBodegas.isEmpty ? null : onBodegaChanged,
                           decoration:
                               const InputDecoration(labelText: 'Bodega'),
                         ),
@@ -2102,7 +2117,8 @@ class _FacturaDatosCard extends StatelessWidget {
                               child: SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
                             )
                           : IconButton(
@@ -2210,12 +2226,14 @@ class _PagoResumenCard extends StatelessWidget {
                     children: List.generate(pagos.length, (index) {
                       final pago = pagos[index];
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: defaultPadding / 2),
+                        padding:
+                            const EdgeInsets.only(bottom: defaultPadding / 2),
                         child: Row(
                           children: [
                             Expanded(
                               flex: 3,
                               child: DropdownButtonFormField<String>(
+                                isExpanded: true,
                                 value: pago.formaPago,
                                 items: const [
                                   DropdownMenuItem(
@@ -2478,7 +2496,8 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
       return;
     }
     final inventariosProvider = context.read<InventariosProvider>();
-    final disponible = await inventariosProvider.fetchProductoDisponibleByCodigo(
+    final disponible =
+        await inventariosProvider.fetchProductoDisponibleByCodigo(
       bodegaId: bodegaId,
       codigo: codigo,
     );
@@ -2530,9 +2549,9 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
     if (hasSelected) {
       return productos;
     }
-    final selected = fallback
-        .cast<Producto?>()
-        .firstWhere((producto) => producto?.id == selectedId, orElse: () => null);
+    final selected = fallback.cast<Producto?>().firstWhere(
+        (producto) => producto?.id == selectedId,
+        orElse: () => null);
     if (selected == null) {
       return productos;
     }
@@ -2672,8 +2691,7 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
                               onSubmitted: (_) => onSubmit(),
                             );
                           },
-                          optionsViewBuilder:
-                              (context, onSelected, options) {
+                          optionsViewBuilder: (context, onSelected, options) {
                             final theme = Theme.of(context);
                             return Align(
                               alignment: Alignment.topLeft,
@@ -2682,8 +2700,8 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
                                 child: Material(
                                   elevation: 6,
                                   color: theme.colorScheme.surface,
-                                  borderRadius:
-                                      const BorderRadius.all(Radius.circular(10)),
+                                  borderRadius: const BorderRadius.all(
+                                      Radius.circular(10)),
                                   child: ConstrainedBox(
                                     constraints: const BoxConstraints(
                                       maxHeight: 260,
@@ -2699,7 +2717,8 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
                                         color: theme.dividerColor.withAlpha(90),
                                       ),
                                       itemBuilder: (context, index) {
-                                        final disponible = options.elementAt(index);
+                                        final disponible =
+                                            options.elementAt(index);
                                         return InkWell(
                                           onTap: () => onSelected(disponible),
                                           child: Padding(
@@ -2714,7 +2733,8 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
                                                 Text(
                                                   '${disponible.codigo} - ${disponible.descripcion}',
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                   style: theme
                                                       .textTheme.bodyMedium,
                                                 ),
@@ -2808,10 +2828,10 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
                         item.productoId,
                         dropdownBodegaId,
                       );
-                      final key = (item.productoId != null &&
-                              dropdownBodegaId != null)
-                          ? _keyFor(item.productoId!, dropdownBodegaId!)
-                          : null;
+                      final key =
+                          (item.productoId != null && dropdownBodegaId != null)
+                              ? _keyFor(item.productoId!, dropdownBodegaId!)
+                              : null;
                       final requiredQty =
                           key == null ? 0 : (requiredByKey[key] ?? 0);
                       final remaining = disponible == null
@@ -2821,9 +2841,9 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
                           loadedForDefault &&
                           dropdownBodegaId == widget.defaultBodegaId &&
                           disponible == null;
-                      final sinStock = (key != null &&
-                              _sinStockKeys.contains(key)) ||
-                          missingInDefault;
+                      final sinStock =
+                          (key != null && _sinStockKeys.contains(key)) ||
+                              missingInDefault;
                       final stockInsuficiente = item.productoId != null &&
                           !bodegaMissing &&
                           (sinStock || (remaining != null && remaining < 0));
@@ -2842,7 +2862,8 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
                           (base - item.descuento) * (impuesto.tarifa / 100);
                       final totalLinea = (base - item.descuento) + ivaMonto;
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: defaultPadding / 2),
+                        padding:
+                            const EdgeInsets.only(bottom: defaultPadding / 2),
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Container(
@@ -2856,174 +2877,182 @@ class _FacturaItemsCardState extends State<_FacturaItemsCard> {
                             ),
                             child: Row(
                               children: [
-                              SizedBox(
-                                width: 320,
-                                child: DropdownButtonFormField<int>(
-                                  isExpanded: true,
-                                  value: item.productoId,
-                                  items: dropdownProductos
-                                      .map(
-                                        (producto) => DropdownMenuItem(
-                                          value: producto.id,
-                                          child: SizedBox(
-                                            width: 260,
+                                SizedBox(
+                                  width: 320,
+                                  child: DropdownButtonFormField<int>(
+                                    isExpanded: true,
+                                    value: item.productoId,
+                                    items: dropdownProductos
+                                        .map(
+                                          (producto) => DropdownMenuItem(
+                                            value: producto.id,
+                                            child: SizedBox(
+                                              width: 260,
+                                              child: Text(
+                                                producto.descripcion,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (value) {
+                                      item.productoId = value;
+                                      widget.onChanged();
+                                      final bodegaId = item.bodegaId ??
+                                          widget.defaultBodegaId;
+                                      if (value != null && bodegaId != null) {
+                                        _ensureDisponibleDetalle(
+                                          productoId: value,
+                                          bodegaId: bodegaId,
+                                        );
+                                      }
+                                    },
+                                    decoration: _itemDecoration(
+                                      context,
+                                      'Producto',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: defaultPadding / 2),
+                                SizedBox(
+                                  width: 200,
+                                  child: DropdownButtonFormField<int>(
+                                    isExpanded: true,
+                                    value: dropdownBodegaId,
+                                    items: availableBodegas
+                                        .map(
+                                          (bodega) => DropdownMenuItem(
+                                            value: bodega.id,
                                             child: Text(
-                                              producto.descripcion,
+                                              bodega.nombre,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    item.productoId = value;
-                                    widget.onChanged();
-                                    final bodegaId =
-                                        item.bodegaId ?? widget.defaultBodegaId;
-                                    if (value != null && bodegaId != null) {
-                                      _ensureDisponibleDetalle(
-                                        productoId: value,
-                                        bodegaId: bodegaId,
-                                      );
-                                    }
-                                  },
-                                  decoration: _itemDecoration(
-                                    context,
-                                    'Producto',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: defaultPadding / 2),
-                              SizedBox(
-                                width: 200,
-                                child: DropdownButtonFormField<int>(
-                                  value: dropdownBodegaId,
-                                  items: availableBodegas
-                                      .map(
-                                        (bodega) => DropdownMenuItem(
-                                          value: bodega.id,
-                                          child: Text(bodega.nombre),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: availableBodegas.isEmpty
-                                      ? null
-                                      : (value) {
-                                          item.bodegaId = value;
-                                          widget.onChanged();
-                                          final productoId = item.productoId;
-                                          if (value != null &&
-                                              productoId != null) {
-                                            _ensureDisponibleDetalle(
-                                              productoId: productoId,
-                                              bodegaId: value,
-                                            );
-                                          }
-                                        },
-                                  decoration: _itemDecoration(
-                                    context,
-                                    'Bodega',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: defaultPadding / 2),
-                              SizedBox(
-                                width: 110,
-                                child: TextFormField(
-                                  initialValue: item.cantidad.toString(),
-                                  decoration:
-                                      _itemDecoration(context, 'Cantidad'),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (value) {
-                                    item.cantidad = int.tryParse(value) ?? 0;
-                                    widget.onChanged();
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: defaultPadding / 2),
-                              SizedBox(
-                                width: 110,
-                                child: InputDecorator(
-                                  decoration:
-                                      _itemDecoration(context, 'Existencia'),
-                                  child: Text(
-                                    stockLabel,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: stockColor,
+                                        )
+                                        .toList(),
+                                    onChanged: availableBodegas.isEmpty
+                                        ? null
+                                        : (value) {
+                                            item.bodegaId = value;
+                                            widget.onChanged();
+                                            final productoId = item.productoId;
+                                            if (value != null &&
+                                                productoId != null) {
+                                              _ensureDisponibleDetalle(
+                                                productoId: productoId,
+                                                bodegaId: value,
+                                              );
+                                            }
+                                          },
+                                    decoration: _itemDecoration(
+                                      context,
+                                      'Bodega',
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: defaultPadding / 2),
-                              SizedBox(
-                                width: 130,
-                                child: TextFormField(
-                                  initialValue:
-                                      item.descuento.toStringAsFixed(2),
-                                  decoration:
-                                      _itemDecoration(context, 'Descuento'),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (value) {
-                                    item.descuento =
-                                        double.tryParse(value) ?? 0;
+                                const SizedBox(width: defaultPadding / 2),
+                                SizedBox(
+                                  width: 110,
+                                  child: TextFormField(
+                                    initialValue: item.cantidad.toString(),
+                                    decoration:
+                                        _itemDecoration(context, 'Cantidad'),
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (value) {
+                                      item.cantidad = int.tryParse(value) ?? 0;
+                                      widget.onChanged();
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: defaultPadding / 2),
+                                SizedBox(
+                                  width: 110,
+                                  child: InputDecorator(
+                                    decoration:
+                                        _itemDecoration(context, 'Existencia'),
+                                    child: Text(
+                                      stockLabel,
+                                      style:
+                                          theme.textTheme.bodyMedium?.copyWith(
+                                        color: stockColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: defaultPadding / 2),
+                                SizedBox(
+                                  width: 130,
+                                  child: TextFormField(
+                                    initialValue:
+                                        item.descuento.toStringAsFixed(2),
+                                    decoration:
+                                        _itemDecoration(context, 'Descuento'),
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (value) {
+                                      item.descuento =
+                                          double.tryParse(value) ?? 0;
+                                      widget.onChanged();
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: defaultPadding / 2),
+                                SizedBox(
+                                  width: 130,
+                                  child: TextFormField(
+                                    key: ValueKey(
+                                      'precio-${item.productoId}-${producto.precioUnitario}',
+                                    ),
+                                    initialValue: producto.precioUnitario
+                                        .toStringAsFixed(2),
+                                    readOnly: true,
+                                    decoration:
+                                        _itemDecoration(context, 'Costo'),
+                                  ),
+                                ),
+                                const SizedBox(width: defaultPadding / 2),
+                                SizedBox(
+                                  width: 130,
+                                  child: TextFormField(
+                                    key: ValueKey(
+                                      'iva-${item.productoId}-${item.cantidad}-${item.descuento}',
+                                    ),
+                                    initialValue: ivaMonto.toStringAsFixed(2),
+                                    readOnly: true,
+                                    decoration: _itemDecoration(context, 'IVA'),
+                                  ),
+                                ),
+                                const SizedBox(width: defaultPadding / 2),
+                                SizedBox(
+                                  width: 140,
+                                  child: TextFormField(
+                                    key: ValueKey(
+                                      'total-${item.productoId}-${item.cantidad}-${item.descuento}',
+                                    ),
+                                    initialValue: totalLinea.toStringAsFixed(2),
+                                    readOnly: true,
+                                    decoration:
+                                        _itemDecoration(context, 'Total'),
+                                  ),
+                                ),
+                                const SizedBox(width: defaultPadding / 2),
+                                IconButton(
+                                  onPressed: () {
+                                    if (items.length == 1) {
+                                      return;
+                                    }
+                                    items.removeAt(index);
                                     widget.onChanged();
                                   },
+                                  icon: const Icon(Icons.delete_outline),
                                 ),
-                              ),
-                              const SizedBox(width: defaultPadding / 2),
-                              SizedBox(
-                                width: 130,
-                                child: TextFormField(
-                                  key: ValueKey(
-                                    'precio-${item.productoId}-${producto.precioUnitario}',
-                                  ),
-                                  initialValue:
-                                      producto.precioUnitario.toStringAsFixed(2),
-                                  readOnly: true,
-                                  decoration: _itemDecoration(context, 'Costo'),
-                                ),
-                              ),
-                              const SizedBox(width: defaultPadding / 2),
-                              SizedBox(
-                                width: 130,
-                                child: TextFormField(
-                                  key: ValueKey(
-                                    'iva-${item.productoId}-${item.cantidad}-${item.descuento}',
-                                  ),
-                                  initialValue: ivaMonto.toStringAsFixed(2),
-                                  readOnly: true,
-                                  decoration: _itemDecoration(context, 'IVA'),
-                                ),
-                              ),
-                              const SizedBox(width: defaultPadding / 2),
-                              SizedBox(
-                                width: 140,
-                                child: TextFormField(
-                                  key: ValueKey(
-                                    'total-${item.productoId}-${item.cantidad}-${item.descuento}',
-                                  ),
-                                  initialValue: totalLinea.toStringAsFixed(2),
-                                  readOnly: true,
-                                  decoration: _itemDecoration(context, 'Total'),
-                                ),
-                              ),
-                              const SizedBox(width: defaultPadding / 2),
-                              IconButton(
-                                onPressed: () {
-                                  if (items.length == 1) {
-                                    return;
-                                  }
-                                  items.removeAt(index);
-                                  widget.onChanged();
-                                },
-                                icon: const Icon(Icons.delete_outline),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
+                      );
                     }),
                   ),
                 ],
@@ -3158,8 +3187,7 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
     if (!estados.contains(_estadoFiltro)) {
       _estadoFiltro = _todasKey;
     }
-    if (widget.empresaId != null &&
-        widget.empresaId != oldWidget.empresaId) {
+    if (widget.empresaId != null && widget.empresaId != oldWidget.empresaId) {
       _page = 0;
       _request();
     }
@@ -3201,6 +3229,7 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
         theme.colorScheme.surface,
       );
     }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
@@ -3256,12 +3285,17 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                   const SizedBox(height: defaultPadding),
                   widget.canSelectEmpresa
                       ? DropdownButtonFormField<int>(
+                          isExpanded: true,
                           value: widget.empresaId,
                           items: widget.empresas
                               .map(
                                 (empresa) => DropdownMenuItem(
                                   value: empresa.id,
-                                  child: Text(empresa.razonSocial),
+                                  child: Text(
+                                    empresa.razonSocial,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -3363,8 +3397,7 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                 : maxWidth;
                             final useMenuActions =
                                 !Responsive.isDesktop(context);
-                            final actionsWidth =
-                                useMenuActions ? 200.0 : 360.0;
+                            final actionsWidth = useMenuActions ? 200.0 : 360.0;
                             return Align(
                               alignment: Alignment.topCenter,
                               child: SizedBox(
@@ -3391,9 +3424,8 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                           _normalizeEstado(factura.estado);
                                       final statusColor =
                                           _statusColor(theme, estado);
-                                      final canReenviar =
-                                          facturaId != null &&
-                                              _isEnProceso(estado);
+                                      final canReenviar = facturaId != null &&
+                                          _isEnProceso(estado);
                                       return DataRow(
                                         cells: [
                                           DataCell(
@@ -3437,14 +3469,14 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                         onSelected: (action) {
                                                           switch (action) {
                                                             case _FacturaAction
-                                                                .ver:
+                                                                  .ver:
                                                               _showFacturaDetalle(
                                                                 context,
                                                                 factura,
                                                               );
                                                               break;
                                                             case _FacturaAction
-                                                                .reenviar:
+                                                                  .reenviar:
                                                               if (canReenviar) {
                                                                 widget
                                                                     .onReenviarFactura(
@@ -3453,7 +3485,7 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                               }
                                                               break;
                                                             case _FacturaAction
-                                                                .pdf:
+                                                                  .pdf:
                                                               if (facturaId !=
                                                                   null) {
                                                                 widget
@@ -3463,7 +3495,7 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                               }
                                                               break;
                                                             case _FacturaAction
-                                                                .xml:
+                                                                  .xml:
                                                               if (facturaId !=
                                                                   null) {
                                                                 widget
@@ -3477,13 +3509,15 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                         itemBuilder:
                                                             (context) => [
                                                           const PopupMenuItem(
-                                                            value: _FacturaAction
-                                                                .ver,
+                                                            value:
+                                                                _FacturaAction
+                                                                    .ver,
                                                             child: Text('Ver'),
                                                           ),
                                                           PopupMenuItem(
-                                                            value: _FacturaAction
-                                                                .reenviar,
+                                                            value:
+                                                                _FacturaAction
+                                                                    .reenviar,
                                                             enabled:
                                                                 canReenviar,
                                                             child: const Text(
@@ -3491,13 +3525,15 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                             ),
                                                           ),
                                                           const PopupMenuItem(
-                                                            value: _FacturaAction
-                                                                .pdf,
+                                                            value:
+                                                                _FacturaAction
+                                                                    .pdf,
                                                             child: Text('PDF'),
                                                           ),
                                                           const PopupMenuItem(
-                                                            value: _FacturaAction
-                                                                .xml,
+                                                            value:
+                                                                _FacturaAction
+                                                                    .xml,
                                                             child: Text('XML'),
                                                           ),
                                                         ],
@@ -3524,9 +3560,9 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                         OutlinedButton.icon(
                                                           onPressed: canReenviar
                                                               ? () => widget
-                                                                  .onReenviarFactura(
-                                                                facturaId!,
-                                                              )
+                                                                      .onReenviarFactura(
+                                                                    facturaId!,
+                                                                  )
                                                               : null,
                                                           icon: const Icon(
                                                             Icons.refresh,
@@ -3540,9 +3576,9 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                                   null
                                                               ? null
                                                               : () => widget
-                                                                  .onDescargarPdf(
-                                                                facturaId,
-                                                              ),
+                                                                      .onDescargarPdf(
+                                                                    facturaId,
+                                                                  ),
                                                           icon: const Icon(
                                                             Icons
                                                                 .picture_as_pdf_outlined,
@@ -3556,9 +3592,9 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                                   null
                                                               ? null
                                                               : () => widget
-                                                                  .onDescargarXml(
-                                                                facturaId,
-                                                              ),
+                                                                      .onDescargarXml(
+                                                                    facturaId,
+                                                                  ),
                                                           icon: const Icon(
                                                             Icons.code_outlined,
                                                           ),
@@ -3756,7 +3792,8 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _DetailRow(label: 'Fecha', value: _formatFecha(factura.fechaEmision)),
+                _DetailRow(
+                    label: 'Fecha', value: _formatFecha(factura.fechaEmision)),
                 _DetailRow(label: 'Monto', value: _formatMonto(factura.total)),
                 Row(
                   children: [

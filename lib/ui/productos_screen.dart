@@ -60,7 +60,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
         ChangeNotifierProvider.value(value: _categoriasProvider),
         ChangeNotifierProvider.value(value: _impuestosProvider),
       ],
-      child: Consumer3<ProductosProvider, CategoriasProvider, ImpuestosProvider>(
+      child:
+          Consumer3<ProductosProvider, CategoriasProvider, ImpuestosProvider>(
         builder: (context, productosProvider, categoriasProvider,
             impuestosProvider, _) {
           final authProvider = context.watch<AuthProvider>();
@@ -270,8 +271,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
                       const SizedBox(height: defaultPadding / 2),
                       TextFormField(
                         controller: codigoBarrasController,
-                        decoration:
-                            const InputDecoration(labelText: 'Codigo de barras'),
+                        decoration: const InputDecoration(
+                            labelText: 'Codigo de barras'),
                       ),
                       const SizedBox(height: defaultPadding / 2),
                       TextFormField(
@@ -303,12 +304,17 @@ class _ProductosScreenState extends State<ProductosScreen> {
                       ),
                       const SizedBox(height: defaultPadding / 2),
                       DropdownButtonFormField<int>(
+                        isExpanded: true,
                         value: categoriaId,
                         items: categorias
                             .map(
                               (categoria) => DropdownMenuItem(
                                 value: categoria.id,
-                                child: Text(categoria.nombre),
+                                child: Text(
+                                  categoria.nombre,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             )
                             .toList(),
@@ -326,6 +332,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                       ),
                       const SizedBox(height: defaultPadding / 2),
                       DropdownButtonFormField<int>(
+                        isExpanded: true,
                         value: impuestoId,
                         items: impuestos
                             .map(
@@ -333,6 +340,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
                                 value: impuesto.id,
                                 child: Text(
                                   '${impuesto.descripcion} (${impuesto.tarifa.toStringAsFixed(2)}%)',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             )
@@ -374,8 +383,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                 if (!formKey.currentState!.validate()) {
                   return;
                 }
-                final provider =
-                    providerContext.read<ProductosProvider>();
+                final provider = providerContext.read<ProductosProvider>();
                 final payload = Producto(
                   id: producto?.id,
                   codigo: codigoController.text.trim(),
@@ -393,8 +401,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                 if (!ok) {
                   showAppToast(
                     providerContext,
-                    provider.errorMessage ??
-                        'No se pudo guardar el producto.',
+                    provider.errorMessage ?? 'No se pudo guardar el producto.',
                     isError: true,
                   );
                   return;
@@ -403,9 +410,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                   Navigator.of(context).pop();
                   showAppToast(
                     providerContext,
-                    isEditing
-                        ? 'Producto actualizado.'
-                        : 'Producto creado.',
+                    isEditing ? 'Producto actualizado.' : 'Producto creado.',
                   );
                 }
               },

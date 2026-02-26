@@ -107,8 +107,13 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
         ChangeNotifierProvider.value(value: _categoriasProvider),
         ChangeNotifierProvider.value(value: _impuestosProvider),
       ],
-      child: Consumer6<ProveedoresProvider, DocumentosProveedorProvider,
-          CxpProvider, PagosProveedorProvider, ProductosProvider, BodegasProvider>(
+      child: Consumer6<
+          ProveedoresProvider,
+          DocumentosProveedorProvider,
+          CxpProvider,
+          PagosProveedorProvider,
+          ProductosProvider,
+          BodegasProvider>(
         builder: (context, proveedoresProvider, documentosProvider, cxpProvider,
             pagosProvider, productosProvider, bodegasProvider, _) {
           final categoriasProvider = context.watch<CategoriasProvider>();
@@ -346,10 +351,8 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
     if (_selectedProveedorId == null) {
       return;
     }
-    final proveedorIds = proveedores
-        .map((proveedor) => proveedor.id)
-        .whereType<int>()
-        .toSet();
+    final proveedorIds =
+        proveedores.map((proveedor) => proveedor.id).whereType<int>().toSet();
     if (!proveedorIds.contains(_selectedProveedorId)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -694,13 +697,11 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                 }
                 setState(() => isConsultingSri = true);
                 try {
-                  final provider =
-                      providerContext.read<ProveedoresProvider>();
+                  final provider = providerContext.read<ProveedoresProvider>();
                   final result = await provider.consultarSri(identificacion);
                   lastSriConsulta = identificacion;
                   if (result.encontrado && result.data != null) {
-                    razonSocialController.text =
-                        result.data!.razonSocial ?? '';
+                    razonSocialController.text = result.data!.razonSocial ?? '';
                     if (nombreComercialController.text.trim().isEmpty) {
                       nombreComercialController.text =
                           result.data!.razonSocial ?? '';
@@ -745,11 +746,13 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: tipoIdentificacion,
                         items: const [
                           DropdownMenuItem(value: '04', child: Text('RUC')),
                           DropdownMenuItem(value: '05', child: Text('Cedula')),
-                          DropdownMenuItem(value: '06', child: Text('Pasaporte')),
+                          DropdownMenuItem(
+                              value: '06', child: Text('Pasaporte')),
                         ],
                         onChanged: isEditing
                             ? null
@@ -783,8 +786,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                           SizedBox(
                             height: 48,
                             child: FilledButton(
-                              onPressed:
-                                  isConsultingSri ? null : consultarSri,
+                              onPressed: isConsultingSri ? null : consultarSri,
                               child: isConsultingSri
                                   ? const SizedBox(
                                       width: 18,
@@ -836,7 +838,8 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                       const SizedBox(height: defaultPadding / 2),
                       TextFormField(
                         controller: telefonoController,
-                        decoration: const InputDecoration(labelText: 'Telefono'),
+                        decoration:
+                            const InputDecoration(labelText: 'Telefono'),
                       ),
                       const SizedBox(height: defaultPadding / 2),
                       TextFormField(
@@ -1097,8 +1100,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                 }
                 setState(() {
                   for (final item in items) {
-                    final precio =
-                        item.costoUnitario * (1 + (margen / 100));
+                    final precio = item.costoUnitario * (1 + (margen / 100));
                     item.precioVenta = precio;
                     item.precioVentaController?.text =
                         precio.toStringAsFixed(2);
@@ -1122,7 +1124,8 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                               .map(
                                 (proveedor) => DropdownMenuItem(
                                   value: proveedor.id!,
-                                  child: buildProveedorLabel(context, proveedor),
+                                  child:
+                                      buildProveedorLabel(context, proveedor),
                                 ),
                               )
                               .toList(),
@@ -1140,20 +1143,26 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                         ),
                         const SizedBox(height: defaultPadding / 2),
                         DropdownButtonFormField<int>(
+                          isExpanded: true,
                           value: bodegaId,
                           items: bodegas
                               .where((bodega) => bodega.id != null)
                               .map(
                                 (bodega) => DropdownMenuItem(
                                   value: bodega.id!,
-                                  child: Text(bodega.nombre),
+                                  child: Text(
+                                    bodega.nombre,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               )
                               .toList(),
                           onChanged: (value) {
                             setState(() => bodegaId = value);
                           },
-                          decoration: const InputDecoration(labelText: 'Bodega'),
+                          decoration:
+                              const InputDecoration(labelText: 'Bodega'),
                           validator: (value) {
                             if (value == null) {
                               return 'Seleccione bodega';
@@ -1163,6 +1172,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                         ),
                         const SizedBox(height: defaultPadding / 2),
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           value: tipoDocumento,
                           items: const [
                             DropdownMenuItem(
@@ -1184,8 +1194,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                             }
                             setState(() => tipoDocumento = value);
                           },
-                          decoration:
-                              const InputDecoration(labelText: 'Tipo'),
+                          decoration: const InputDecoration(labelText: 'Tipo'),
                         ),
                         const SizedBox(height: defaultPadding / 2),
                         TextFormField(
@@ -1393,40 +1402,38 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                   return;
                 }
 
-                final documentoItems = items
-                    .where((item) => item.productoId != null)
-                    .map(
-                      (item) {
-                        final producto = productos.firstWhere(
-                          (producto) => producto.id == item.productoId,
-                          orElse: () => Producto(
-                            id: 0,
-                            codigo: '-',
-                            descripcion: 'Producto',
-                            precioUnitario: 0,
-                            categoriaId: 0,
-                            impuestoId: 0,
-                          ),
-                        );
-                        final costoUnitario = item.costoUnitario > 0
-                            ? item.costoUnitario
-                            : producto.precioUnitario;
-                        final subtotal = costoUnitario * item.cantidad;
-                        return DocumentoProveedorItem(
-                          bodegaId: bodegaId,
-                          productoId: item.productoId,
-                          codigoPrincipal: producto.codigo,
-                          codigoBarras: producto.codigoBarras,
-                          descripcion: producto.descripcion,
-                          precioVenta:
-                              item.precioVenta > 0 ? item.precioVenta : null,
-                          cantidad: item.cantidad,
-                          costoUnitario: costoUnitario,
-                          subtotal: subtotal,
-                        );
-                      },
-                    )
-                    .toList();
+                final documentoItems =
+                    items.where((item) => item.productoId != null).map(
+                  (item) {
+                    final producto = productos.firstWhere(
+                      (producto) => producto.id == item.productoId,
+                      orElse: () => Producto(
+                        id: 0,
+                        codigo: '-',
+                        descripcion: 'Producto',
+                        precioUnitario: 0,
+                        categoriaId: 0,
+                        impuestoId: 0,
+                      ),
+                    );
+                    final costoUnitario = item.costoUnitario > 0
+                        ? item.costoUnitario
+                        : producto.precioUnitario;
+                    final subtotal = costoUnitario * item.cantidad;
+                    return DocumentoProveedorItem(
+                      bodegaId: bodegaId,
+                      productoId: item.productoId,
+                      codigoPrincipal: producto.codigo,
+                      codigoBarras: producto.codigoBarras,
+                      descripcion: producto.descripcion,
+                      precioVenta:
+                          item.precioVenta > 0 ? item.precioVenta : null,
+                      cantidad: item.cantidad,
+                      costoUnitario: costoUnitario,
+                      subtotal: subtotal,
+                    );
+                  },
+                ).toList();
                 final subtotal = documentoItems.fold<double>(
                   0,
                   (sum, item) => sum + (item.subtotal ?? 0),
@@ -1595,8 +1602,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                 if (preview == null) {
                   showAppToast(
                     providerContext,
-                    provider.errorMessage ??
-                        'No se pudo obtener el preview.',
+                    provider.errorMessage ?? 'No se pudo obtener el preview.',
                     isError: true,
                   );
                   return;
@@ -1756,8 +1762,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
       proveedorId = _resolveFirstProveedorId(proveedores);
     }
     DateTime fechaPago = DateTime.now();
-    final fechaController =
-        TextEditingController(text: _formatDate(fechaPago));
+    final fechaController = TextEditingController(text: _formatDate(fechaPago));
     final formaPagoController = TextEditingController();
     final referenciaController = TextEditingController();
     final observacionController = TextEditingController();
@@ -1815,8 +1820,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                                   decoration: const InputDecoration(
                                     labelText: 'Buscar por numero',
                                   ),
-                                  onChanged: (_) =>
-                                      setInnerState(() {}),
+                                  onChanged: (_) => setInnerState(() {}),
                                 ),
                                 const SizedBox(height: defaultPadding),
                                 SizedBox(
@@ -2017,8 +2021,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                       )
                       .toList(),
                 );
-                final provider =
-                    providerContext.read<PagosProveedorProvider>();
+                final provider = providerContext.read<PagosProveedorProvider>();
                 final ok = await provider.createPago(pago);
                 if (providerContext.mounted) {
                   Navigator.of(providerContext).pop();
@@ -2074,8 +2077,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
             codigoPrincipal: item.codigoPrincipal ?? '',
             codigoBarras: item.codigoBarras ?? '',
             descripcion: item.descripcion ?? '',
-            precioVenta:
-                item.precioVenta ?? item.costoUnitario ?? 0,
+            precioVenta: item.precioVenta ?? item.costoUnitario ?? 0,
             cantidad: item.cantidad ?? 0,
             costoUnitario: item.costoUnitario ?? 0,
             subtotal: item.subtotal ?? 0,
@@ -2151,16 +2153,14 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
               }
 
               void applyMargenToAll() {
-                final raw =
-                    margenController.text.trim().replaceAll(',', '.');
+                final raw = margenController.text.trim().replaceAll(',', '.');
                 final margen = double.tryParse(raw) ?? 0;
                 if (margen <= 0) {
                   return;
                 }
                 setState(() {
                   for (final item in items) {
-                    final precio =
-                        item.costoUnitario * (1 + (margen / 100));
+                    final precio = item.costoUnitario * (1 + (margen / 100));
                     item.precioVenta = precio;
                     item.precioVentaController?.text =
                         precio.toStringAsFixed(2);
@@ -2193,8 +2193,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                                   decoration: const InputDecoration(
                                     labelText: 'Buscar bodega',
                                   ),
-                                  onChanged: (_) =>
-                                      setInnerState(() {}),
+                                  onChanged: (_) => setInnerState(() {}),
                                 ),
                                 const SizedBox(height: defaultPadding),
                                 SizedBox(
@@ -2240,10 +2239,9 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                       builder: (context, setInnerState) {
                         final query = controller.text.trim().toLowerCase();
                         final filtered = availableImpuestos
-                            .where((impuesto) =>
-                                impuesto.descripcion
-                                    .toLowerCase()
-                                    .contains(query))
+                            .where((impuesto) => impuesto.descripcion
+                                .toLowerCase()
+                                .contains(query))
                             .toList();
                         return AlertDialog(
                           title: const Text('Seleccionar impuesto'),
@@ -2257,8 +2255,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                                   decoration: const InputDecoration(
                                     labelText: 'Buscar impuesto',
                                   ),
-                                  onChanged: (_) =>
-                                      setInnerState(() {}),
+                                  onChanged: (_) => setInnerState(() {}),
                                 ),
                                 const SizedBox(height: defaultPadding),
                                 SizedBox(
@@ -2321,8 +2318,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                                   decoration: const InputDecoration(
                                     labelText: 'Buscar o crear',
                                   ),
-                                  onChanged: (_) =>
-                                      setInnerState(() {}),
+                                  onChanged: (_) => setInnerState(() {}),
                                 ),
                                 const SizedBox(height: defaultPadding),
                                 SizedBox(
@@ -2371,17 +2367,17 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                                     }
                                     return;
                                   }
-                                  final created = provider.categorias
-                                      .firstWhere(
-                                        (item) =>
-                                            item.nombre.toLowerCase() ==
-                                            nombre.toLowerCase(),
-                                        orElse: () => Categoria(
-                                          id: null,
-                                          nombre: nombre,
-                                          descripcion: nombre,
-                                        ),
-                                      );
+                                  final created =
+                                      provider.categorias.firstWhere(
+                                    (item) =>
+                                        item.nombre.toLowerCase() ==
+                                        nombre.toLowerCase(),
+                                    orElse: () => Categoria(
+                                      id: null,
+                                      nombre: nombre,
+                                      descripcion: nombre,
+                                    ),
+                                  );
                                   if (created.id != null) {
                                     availableCategorias.add(created);
                                     selected = created;
@@ -2469,7 +2465,8 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                         ),
                       if (isSaving)
                         Padding(
-                          padding: const EdgeInsets.only(top: defaultPadding / 2),
+                          padding:
+                              const EdgeInsets.only(top: defaultPadding / 2),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -2509,109 +2506,113 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
               onPressed: isSaving
                   ? null
                   : () async {
-                if (!hasBodegas) {
-                  showAppToast(
-                    providerContext,
-                    'Registra bodegas para guardar.',
-                    isError: true,
-                  );
-                  return;
-                }
-                if (items.any((item) => item.bodegaId == null)) {
-                  showAppToast(
-                    providerContext,
-                    'Asigna bodega a todos los items.',
-                    isError: true,
-                  );
-                  return;
-                }
-                if (items.any((item) =>
-                    item.productoId == null &&
-                    (item.categoriaId == null || item.impuestoId == null))) {
-                  showAppToast(
-                    providerContext,
-                    'Asigna categoria e impuesto para productos nuevos.',
-                    isError: true,
-                  );
-                  return;
-                }
-                if (items.any(
-                  (item) => item.productoId == null && item.precioVenta <= 0,
-                )) {
-                  showAppToast(
-                    providerContext,
-                    'Ingresa el precio de venta para productos nuevos.',
-                    isError: true,
-                  );
-                  return;
-                }
-                final documento = DocumentoProveedor(
-                  tipoDocumento: preview.tipoDocumento,
-                  numeroDocumento: preview.numeroDocumento,
-                  numeroAutorizacion: preview.numeroAutorizacion,
-                  fechaEmision: preview.fechaEmision,
-                  subtotal: preview.subtotal,
-                  impuestos: preview.impuestos,
-                  total: preview.total,
-                  moneda: preview.moneda ?? 'USD',
-                  items: items
-                      .map(
-                        (item) => DocumentoProveedorItem(
-                          bodegaId: item.bodegaId,
-                          productoId: item.productoId,
-                          categoriaId: item.productoId == null
-                              ? item.categoriaId
-                              : null,
-                          impuestoId: item.productoId == null
-                              ? item.impuestoId
-                              : null,
-                          codigoPrincipal: item.codigoPrincipal,
-                          codigoBarras: item.codigoBarras?.trim().isEmpty ?? true
-                              ? null
-                              : item.codigoBarras?.trim(),
-                          descripcion: item.descripcion,
-                          precioVenta:
-                              item.precioVenta > 0 ? item.precioVenta : null,
-                          cantidad: item.cantidad,
-                          costoUnitario: item.costoUnitario,
-                          subtotal: item.subtotal,
-                        ),
-                      )
-                      .toList(),
-                );
-                final provider =
-                    providerContext.read<DocumentosProveedorProvider>();
-                setState(() => isSaving = true);
-                showFacturaProcessingDialog(
-                  context: providerContext,
-                  title: 'Procesando documento...',
-                  message:
-                      'Estamos guardando el documento. Por favor, no cierres la ventana.',
-                );
-                final ok = await provider.createDocumentoManual(
-                  proveedorId: proveedorId,
-                  documento: documento,
-                );
-                if (providerContext.mounted) {
-                  Navigator.of(providerContext).pop();
-                }
-                if (context.mounted) {
-                  setState(() => isSaving = false);
-                }
-                if (!ok) {
-                  showAppToast(
-                    providerContext,
-                    provider.errorMessage ??
-                        'No se pudo registrar el documento.',
-                    isError: true,
-                  );
-                  return;
-                }
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                  showAppToast(providerContext, 'Documento registrado.');
-                }
-              },
+                      if (!hasBodegas) {
+                        showAppToast(
+                          providerContext,
+                          'Registra bodegas para guardar.',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      if (items.any((item) => item.bodegaId == null)) {
+                        showAppToast(
+                          providerContext,
+                          'Asigna bodega a todos los items.',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      if (items.any((item) =>
+                          item.productoId == null &&
+                          (item.categoriaId == null ||
+                              item.impuestoId == null))) {
+                        showAppToast(
+                          providerContext,
+                          'Asigna categoria e impuesto para productos nuevos.',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      if (items.any(
+                        (item) =>
+                            item.productoId == null && item.precioVenta <= 0,
+                      )) {
+                        showAppToast(
+                          providerContext,
+                          'Ingresa el precio de venta para productos nuevos.',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      final documento = DocumentoProveedor(
+                        tipoDocumento: preview.tipoDocumento,
+                        numeroDocumento: preview.numeroDocumento,
+                        numeroAutorizacion: preview.numeroAutorizacion,
+                        fechaEmision: preview.fechaEmision,
+                        subtotal: preview.subtotal,
+                        impuestos: preview.impuestos,
+                        total: preview.total,
+                        moneda: preview.moneda ?? 'USD',
+                        items: items
+                            .map(
+                              (item) => DocumentoProveedorItem(
+                                bodegaId: item.bodegaId,
+                                productoId: item.productoId,
+                                categoriaId: item.productoId == null
+                                    ? item.categoriaId
+                                    : null,
+                                impuestoId: item.productoId == null
+                                    ? item.impuestoId
+                                    : null,
+                                codigoPrincipal: item.codigoPrincipal,
+                                codigoBarras:
+                                    item.codigoBarras?.trim().isEmpty ?? true
+                                        ? null
+                                        : item.codigoBarras?.trim(),
+                                descripcion: item.descripcion,
+                                precioVenta: item.precioVenta > 0
+                                    ? item.precioVenta
+                                    : null,
+                                cantidad: item.cantidad,
+                                costoUnitario: item.costoUnitario,
+                                subtotal: item.subtotal,
+                              ),
+                            )
+                            .toList(),
+                      );
+                      final provider =
+                          providerContext.read<DocumentosProveedorProvider>();
+                      setState(() => isSaving = true);
+                      showFacturaProcessingDialog(
+                        context: providerContext,
+                        title: 'Procesando documento...',
+                        message:
+                            'Estamos guardando el documento. Por favor, no cierres la ventana.',
+                      );
+                      final ok = await provider.createDocumentoManual(
+                        proveedorId: proveedorId,
+                        documento: documento,
+                      );
+                      if (providerContext.mounted) {
+                        Navigator.of(providerContext).pop();
+                      }
+                      if (context.mounted) {
+                        setState(() => isSaving = false);
+                      }
+                      if (!ok) {
+                        showAppToast(
+                          providerContext,
+                          provider.errorMessage ??
+                              'No se pudo registrar el documento.',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                        showAppToast(providerContext, 'Documento registrado.');
+                      }
+                    },
               child: const Text('Guardar'),
             ),
           ],
@@ -2717,13 +2718,11 @@ class _ProveedorFilter extends StatelessWidget {
             value: null,
             child: Text('Todos los proveedores'),
           ),
-          ...proveedores
-              .where((proveedor) => proveedor.id != null)
-              .map(
-            (proveedor) => DropdownMenuItem<int?>(
-              value: proveedor.id,
-              child: buildProveedorLabel(context, proveedor),
-            ),
+          ...proveedores.where((proveedor) => proveedor.id != null).map(
+                (proveedor) => DropdownMenuItem<int?>(
+                  value: proveedor.id,
+                  child: buildProveedorLabel(context, proveedor),
+                ),
               ),
         ],
         onChanged: onChanged,
@@ -2952,8 +2951,7 @@ class _DocumentosList extends StatelessWidget {
                             DataCell(Text(documento.numeroDocumento ?? '-')),
                             DataCell(
                               Text(
-                                _formatDateValue(documento.fechaEmision) ??
-                                    '-',
+                                _formatDateValue(documento.fechaEmision) ?? '-',
                               ),
                             ),
                             DataCell(
@@ -3000,9 +2998,7 @@ class _CxpList extends StatelessWidget {
               (cuenta) => Card(
                 child: ListTile(
                   title: Text(
-                    cuenta.documentoNumero ??
-                        cuenta.numeroDocumento ??
-                        '-',
+                    cuenta.documentoNumero ?? cuenta.numeroDocumento ?? '-',
                   ),
                   subtitle: Text(
                     '${cuenta.documentoTipo ?? cuenta.tipoDocumento ?? '-'} | ${_formatDateValue(cuenta.fechaEmision) ?? 'Fecha sin definir'}',
@@ -3231,6 +3227,7 @@ class _DocumentoItemsTableState extends State<_DocumentoItemsTable> {
                   Expanded(
                     flex: 5,
                     child: DropdownButtonFormField<int>(
+                      isExpanded: true,
                       value: item.productoId,
                       items: widget.productos
                           .map(
@@ -3238,6 +3235,8 @@ class _DocumentoItemsTableState extends State<_DocumentoItemsTable> {
                               value: producto.id,
                               child: Text(
                                 '${producto.codigo} - ${producto.descripcion}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           )
@@ -3268,8 +3267,7 @@ class _DocumentoItemsTableState extends State<_DocumentoItemsTable> {
                         });
                         widget.onChanged?.call();
                       },
-                      decoration:
-                          const InputDecoration(labelText: 'Producto'),
+                      decoration: const InputDecoration(labelText: 'Producto'),
                     ),
                   ),
                   const SizedBox(width: defaultPadding / 2),
@@ -3307,8 +3305,7 @@ class _DocumentoItemsTableState extends State<_DocumentoItemsTable> {
                     flex: 3,
                     child: TextFormField(
                       controller: item.precioVentaController,
-                      decoration:
-                          const InputDecoration(labelText: 'PVP'),
+                      decoration: const InputDecoration(labelText: 'PVP'),
                       keyboardType: TextInputType.number,
                       onChanged: (value) {
                         setState(() {
@@ -3361,9 +3358,8 @@ class _DocumentoTotalPanel extends StatelessWidget {
           impuestoId: 0,
         ),
       );
-      final costo = item.costoUnitario > 0
-          ? item.costoUnitario
-          : producto.precioUnitario;
+      final costo =
+          item.costoUnitario > 0 ? item.costoUnitario : producto.precioUnitario;
       subtotal += costo * item.cantidad;
     }
     final total = subtotal + impuestos;
@@ -3402,9 +3398,7 @@ class _PreviewHeader extends StatelessWidget {
       _PreviewRow('Autorizacion', preview.numeroAutorizacion ?? '-'),
       _PreviewRow(
         'Emisor',
-        preview.razonSocialEmisor ??
-            preview.identificacionEmisor ??
-            '-',
+        preview.razonSocialEmisor ?? preview.identificacionEmisor ?? '-',
       ),
       _PreviewRow(
         'Identificacion',
@@ -3740,10 +3734,8 @@ class _PreviewItemsTableState extends State<_PreviewItemsTable> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surface
-                          .withAlpha(220),
+                      color:
+                          Theme.of(context).colorScheme.surface.withAlpha(220),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: Theme.of(context)

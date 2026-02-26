@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../domain/models/usuario_empresa.dart';
-import '../../resource/theme/dimens.dart';
 import '../../routing/app_sections.dart';
 import '../../services/api_client.dart';
 import '../../services/dashboard_service.dart';
@@ -12,7 +11,9 @@ import '../../services/empresas_service.dart';
 import '../../services/usuarios_service.dart';
 import '../../states/auth_provider.dart';
 import '../../states/menu_app_controller.dart';
+import '../../utils/app_responsive.dart';
 import '../../utils/responsive.dart';
+import 'dashboard_layout_tokens.dart';
 import 'components/header.dart';
 import '../../domain/models/dashboard_resumen.dart';
 
@@ -128,16 +129,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = AppResponsive.of(context);
+    final tokens = DashboardLayoutTokens.fromResponsive(responsive);
     return SafeArea(
       child: SingleChildScrollView(
         primary: false,
-        padding: const EdgeInsets.all(defaultPadding),
+        padding: EdgeInsets.all(tokens.pagePadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Header(),
-            const SizedBox(height: defaultPadding),
+            SizedBox(height: tokens.sectionGap),
             _EmpresaSelector(
+              tokens: tokens,
               empresas: _empresas,
               selectedEmpresaId: _selectedEmpresaId,
               isLoading: _loadingEmpresas,
@@ -146,15 +150,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _loadResumen(empresaId: value);
               },
             ),
-            const SizedBox(height: defaultPadding * 1.5),
+            SizedBox(height: tokens.sectionGapLarge),
             if (_loadingResumen)
-              const Padding(
-                padding: EdgeInsets.only(bottom: defaultPadding),
+              Padding(
+                padding: EdgeInsets.only(bottom: tokens.sectionGap),
                 child: LinearProgressIndicator(),
               ),
             if (_resumenError != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: defaultPadding),
+                padding: EdgeInsets.only(bottom: tokens.sectionGap),
                 child: Text(
                   _resumenError!,
                   style: TextStyle(
@@ -162,18 +166,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-            _StatsGrid(resumen: _resumen),
-            const SizedBox(height: defaultPadding * 1.5),
+            _StatsGrid(
+              resumen: _resumen,
+              tokens: tokens,
+              responsive: responsive,
+            ),
+            SizedBox(height: tokens.sectionGapLarge),
             const _SectionTitle(title: 'Accesos rapidos'),
-            const SizedBox(height: defaultPadding),
-            _CashflowCard(resumen: _resumen),
-            const SizedBox(height: defaultPadding * 1.5),
+            SizedBox(height: tokens.sectionGap),
+            _CashflowCard(
+              resumen: _resumen,
+              tokens: tokens,
+            ),
+            SizedBox(height: tokens.sectionGapLarge),
             const _SectionTitle(title: 'Acciones rapidas'),
-            const SizedBox(height: defaultPadding),
+            SizedBox(height: tokens.sectionGap),
             Responsive(
-              mobile: _MobileSummary(resumen: _resumen),
-              tablet: _TabletSummary(resumen: _resumen),
-              desktop: _DesktopSummary(resumen: _resumen),
+              mobile: _MobileSummary(
+                resumen: _resumen,
+                tokens: tokens,
+              ),
+              tablet: _TabletSummary(
+                resumen: _resumen,
+                tokens: tokens,
+              ),
+              desktop: _DesktopSummary(
+                resumen: _resumen,
+                tokens: tokens,
+              ),
             ),
           ],
         ),
@@ -190,32 +210,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _StatsGrid extends StatelessWidget {
-  const _StatsGrid({required this.resumen});
+  const _StatsGrid({
+    required this.resumen,
+    required this.tokens,
+    required this.responsive,
+  });
 
   final DashboardResumen? resumen;
+  final DashboardLayoutTokens tokens;
+  final AppResponsive responsive;
 
   @override
   Widget build(BuildContext context) {
     final stats = _DashboardStatData.fromResumen(resumen);
     final size = MediaQuery.of(context).size;
-    final crossAxisCount = size.width < 650
-        ? 1
-        : Responsive.isMobile(context)
-            ? 2
-            : 4;
-    final ratio = Responsive.isDesktop(context) ? 2.6 : 2.2;
+    final crossAxisCount = tokens.statsCrossAxisCount(
+      width: size.width,
+      responsive: responsive,
+    );
+    final ratio = tokens.statsAspectRatio(responsive);
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: stats.length,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
-        crossAxisSpacing: defaultPadding,
-        mainAxisSpacing: defaultPadding,
+        crossAxisSpacing: tokens.statsGridSpacing,
+        mainAxisSpacing: tokens.statsGridSpacing,
         childAspectRatio: ratio,
       ),
       itemBuilder: (context, index) {
-        return _StatCard(data: stats[index]);
+        return _StatCard(
+          data: stats[index],
+          tokens: tokens,
+        );
       },
     );
   }
@@ -223,12 +251,14 @@ class _StatsGrid extends StatelessWidget {
 
 class _EmpresaSelector extends StatelessWidget {
   const _EmpresaSelector({
+    required this.tokens,
     required this.empresas,
     required this.selectedEmpresaId,
     required this.isLoading,
     required this.onChanged,
   });
 
+  final DashboardLayoutTokens tokens;
   final List<UsuarioEmpresa> empresas;
   final int? selectedEmpresaId;
   final bool isLoading;
@@ -236,6 +266,15 @@ class _EmpresaSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isMobile = AppResponsive.of(context).isMobile;
+    final labelGap = tokens.sectionGap * 0.75;
+    final verticalGap = tokens.smallGap + 2;
+    final labelWidget = Text(
+      'Empresa',
+      style: theme.textTheme.titleSmall,
+    );
+
     if (isLoading) {
       return const LinearProgressIndicator();
     }
@@ -244,61 +283,111 @@ class _EmpresaSelector extends StatelessWidget {
     }
     if (empresas.length == 1) {
       final label = _empresaLabel(empresas.first);
-      final theme = Theme.of(context);
+      final valueChip = Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: labelGap,
+          vertical: tokens.sectionGap * 0.625,
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(tokens.smallGap + 4),
+          border: Border.all(
+            color: theme.colorScheme.outline.withAlpha(153),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+
+      if (isMobile) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            labelWidget,
+            SizedBox(height: verticalGap),
+            SizedBox(
+              width: double.infinity,
+              child: valueChip,
+            ),
+          ],
+        );
+      }
+
       return Row(
         children: [
-          Text(
-            'Empresa',
-            style: theme.textTheme.titleSmall,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: theme.colorScheme.outline.withAlpha(153),
-                ),
-              ),
-              child: Text(
-                label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
+          labelWidget,
+          SizedBox(width: labelGap),
+          Expanded(child: valueChip),
         ],
       );
     }
+
     final items = empresas
         .map(
           (item) => DropdownMenuItem<int>(
             value: item.empresaId,
-            child: Text(_empresaLabel(item)),
+            child: Text(
+              _empresaLabel(item),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         )
         .toList();
+
+    final selector = DropdownButtonFormField<int>(
+      isExpanded: true,
+      initialValue: selectedEmpresaId ?? empresas.first.empresaId,
+      items: items,
+      selectedItemBuilder: (context) {
+        return empresas
+            .map(
+              (item) => Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _empresaLabel(item),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            )
+            .toList();
+      },
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: labelGap,
+          vertical: tokens.sectionGap * 0.625,
+        ),
+      ),
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          labelWidget,
+          SizedBox(height: verticalGap),
+          SizedBox(
+            width: double.infinity,
+            child: selector,
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
-        Text(
-          'Empresa',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: DropdownButtonFormField<int>(
-            value: selectedEmpresaId ?? empresas.first.empresaId,
-            items: items,
-            onChanged: onChanged,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
-          ),
-        ),
+        labelWidget,
+        SizedBox(width: labelGap),
+        Expanded(child: selector),
       ],
     );
   }
@@ -334,9 +423,13 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.data});
+  const _StatCard({
+    required this.data,
+    required this.tokens,
+  });
 
   final _DashboardStatData data;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
@@ -352,31 +445,31 @@ class _StatCard extends StatelessWidget {
     );
 
     return Container(
-      padding: const EdgeInsets.all(defaultPadding),
+      padding: EdgeInsets.all(tokens.dashboardCardPadding),
       decoration: BoxDecoration(
         gradient: gradient,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(tokens.statsCardRadius),
         border: Border.all(color: data.color.withAlpha(140)),
         boxShadow: [
           BoxShadow(
             color: data.color.withAlpha(22),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            blurRadius: tokens.statsCardShadowBlur,
+            offset: Offset(0, tokens.statsCardShadowOffsetY),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            height: 44,
-            width: 44,
+            height: tokens.statsIconBoxSize,
+            width: tokens.statsIconBoxSize,
             decoration: BoxDecoration(
               color: data.color.withAlpha(30),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(tokens.statsIconRadius),
             ),
             child: Icon(data.icon, color: data.color),
           ),
-          const SizedBox(width: defaultPadding),
+          SizedBox(width: tokens.sectionGap),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,14 +481,14 @@ class _StatCard extends StatelessWidget {
                     color: theme.colorScheme.onSurface.withAlpha(160),
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: tokens.statsLabelGap),
                 Text(
                   data.value,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: tokens.statsValueGap),
                 Text(
                   data.caption,
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -414,13 +507,18 @@ class _StatCard extends StatelessWidget {
 }
 
 class _CashflowCard extends StatelessWidget {
-  const _CashflowCard({required this.resumen});
+  const _CashflowCard({
+    required this.resumen,
+    required this.tokens,
+  });
 
   final DashboardResumen? resumen;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     return _DashboardCard(
+      tokens: tokens,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -430,41 +528,45 @@ class _CashflowCard extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
           ),
-          const SizedBox(height: defaultPadding),
+          SizedBox(height: tokens.sectionGap),
           SizedBox(
-            height: 160,
+            height: tokens.cashflowChartHeight,
             child: _MiniLineChart(
               values: _resolveCashflowValues(resumen),
             ),
           ),
-          const SizedBox(height: defaultPadding),
+          SizedBox(height: tokens.sectionGap),
           Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: const [
+            spacing: tokens.sectionGap * 0.75,
+            runSpacing: tokens.sectionGap * 0.75,
+            children: [
               _QuickActionButton(
                 label: 'Nueva Factura',
                 icon: Icons.add_circle_outline,
                 color: Color(0xFF2697FF),
                 section: AppSection.facturacion,
+                tokens: tokens,
               ),
               _QuickActionButton(
                 label: 'Registrar Cliente',
                 icon: Icons.person_add_alt_1,
                 color: Color(0xFF29C98A),
                 section: AppSection.clientes,
+                tokens: tokens,
               ),
               _QuickActionButton(
                 label: 'Entrada Stock',
                 icon: Icons.inventory_2_outlined,
                 color: Color(0xFFF5A524),
                 section: AppSection.inventarios,
+                tokens: tokens,
               ),
               _QuickActionButton(
                 label: 'Subir Factura',
                 icon: Icons.cloud_upload_outlined,
                 color: Color(0xFF7B61FF),
                 section: AppSection.facturacion,
+                tokens: tokens,
               ),
             ],
           ),
@@ -480,31 +582,36 @@ class _QuickActionButton extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.section,
+    required this.tokens,
   });
 
   final String label;
   final IconData icon;
   final Color color;
   final AppSection section;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     final controller = context.read<MenuAppController>();
     return InkWell(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(tokens.quickActionRadius),
       onTap: () => controller.setSection(section),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.quickActionHorizontalPadding,
+          vertical: tokens.quickActionVerticalPadding,
+        ),
         decoration: BoxDecoration(
           color: color.withAlpha(30),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(tokens.quickActionRadius),
           border: Border.all(color: color.withAlpha(120)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
+            Icon(icon, color: color, size: tokens.quickActionIconSize),
+            SizedBox(width: tokens.quickActionIconGap),
             Text(
               label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -520,62 +627,104 @@ class _QuickActionButton extends StatelessWidget {
 }
 
 class _MobileSummary extends StatelessWidget {
-  const _MobileSummary({required this.resumen});
+  const _MobileSummary({
+    required this.resumen,
+    required this.tokens,
+  });
 
   final DashboardResumen? resumen;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _RecentInvoicesCard(resumen: resumen),
-        const SizedBox(height: defaultPadding),
-        _TopProductsCard(resumen: resumen),
-        const SizedBox(height: defaultPadding),
-        _LowStockCard(resumen: resumen),
+        _RecentInvoicesCard(
+          resumen: resumen,
+          tokens: tokens,
+        ),
+        SizedBox(height: tokens.sectionGap),
+        _TopProductsCard(
+          resumen: resumen,
+          tokens: tokens,
+        ),
+        SizedBox(height: tokens.sectionGap),
+        _LowStockCard(
+          resumen: resumen,
+          tokens: tokens,
+        ),
       ],
     );
   }
 }
 
 class _TabletSummary extends StatelessWidget {
-  const _TabletSummary({required this.resumen});
+  const _TabletSummary({
+    required this.resumen,
+    required this.tokens,
+  });
 
   final DashboardResumen? resumen;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _RecentInvoicesCard(resumen: resumen),
-        const SizedBox(height: defaultPadding),
-        _TopProductsCard(resumen: resumen),
-        const SizedBox(height: defaultPadding),
-        _LowStockCard(resumen: resumen),
+        _RecentInvoicesCard(
+          resumen: resumen,
+          tokens: tokens,
+        ),
+        SizedBox(height: tokens.sectionGap),
+        _TopProductsCard(
+          resumen: resumen,
+          tokens: tokens,
+        ),
+        SizedBox(height: tokens.sectionGap),
+        _LowStockCard(
+          resumen: resumen,
+          tokens: tokens,
+        ),
       ],
     );
   }
 }
 
 class _DesktopSummary extends StatelessWidget {
-  const _DesktopSummary({required this.resumen});
+  const _DesktopSummary({
+    required this.resumen,
+    required this.tokens,
+  });
 
   final DashboardResumen? resumen;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 3, child: _RecentInvoicesCard(resumen: resumen)),
-        const SizedBox(width: defaultPadding),
+        Expanded(
+          flex: 3,
+          child: _RecentInvoicesCard(
+            resumen: resumen,
+            tokens: tokens,
+          ),
+        ),
+        SizedBox(width: tokens.sectionGap),
         Expanded(
           flex: 2,
           child: Column(
             children: [
-              _TopProductsCard(resumen: resumen),
-              const SizedBox(height: defaultPadding),
-              _LowStockCard(resumen: resumen),
+              _TopProductsCard(
+                resumen: resumen,
+                tokens: tokens,
+              ),
+              SizedBox(height: tokens.sectionGap),
+              _LowStockCard(
+                resumen: resumen,
+                tokens: tokens,
+              ),
             ],
           ),
         ),
@@ -585,14 +734,19 @@ class _DesktopSummary extends StatelessWidget {
 }
 
 class _RecentInvoicesCard extends StatelessWidget {
-  const _RecentInvoicesCard({required this.resumen});
+  const _RecentInvoicesCard({
+    required this.resumen,
+    required this.tokens,
+  });
 
   final DashboardResumen? resumen;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     final rows = resumen?.ultimasFacturas ?? const <DashboardFacturaItem>[];
     return _DashboardCard(
+      tokens: tokens,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -600,7 +754,7 @@ class _RecentInvoicesCard extends StatelessWidget {
             title: 'Ultimas Facturas',
             actionLabel: 'Ver todo',
           ),
-          const SizedBox(height: defaultPadding),
+          SizedBox(height: tokens.sectionGap),
           if (rows.isEmpty)
             Text(
               'Sin facturas recientes.',
@@ -633,7 +787,9 @@ class _RecentInvoicesCard extends StatelessWidget {
       children: titles
           .map(
             (title) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: EdgeInsets.symmetric(
+                vertical: tokens.tableCellVerticalPadding * 0.8,
+              ),
               child: Text(title, style: style),
             ),
           )
@@ -646,23 +802,27 @@ class _RecentInvoicesCard extends StatelessWidget {
     return TableRow(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding:
+              EdgeInsets.symmetric(vertical: tokens.tableCellVerticalPadding),
           child: Text(
             row.numero ?? '-',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding:
+              EdgeInsets.symmetric(vertical: tokens.tableCellVerticalPadding),
           child: Text(_formatMoney(row.total)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding:
+              EdgeInsets.symmetric(vertical: tokens.tableCellVerticalPadding),
           child: Align(
             alignment: Alignment.centerLeft,
             child: _StatusChip(
               label: row.estado ?? '-',
               color: statusColor,
+              tokens: tokens,
             ),
           ),
         ),
@@ -672,15 +832,20 @@ class _RecentInvoicesCard extends StatelessWidget {
 }
 
 class _TopProductsCard extends StatelessWidget {
-  const _TopProductsCard({required this.resumen});
+  const _TopProductsCard({
+    required this.resumen,
+    required this.tokens,
+  });
 
   final DashboardResumen? resumen;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
-    final rows = resumen?.productosMasVendidos ??
-        const <DashboardProductoVentaItem>[];
+    final rows =
+        resumen?.productosMasVendidos ?? const <DashboardProductoVentaItem>[];
     return _DashboardCard(
+      tokens: tokens,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -688,14 +853,18 @@ class _TopProductsCard extends StatelessWidget {
             title: 'Productos mas vendidos',
             actionLabel: 'Detalle',
           ),
-          const SizedBox(height: defaultPadding),
+          SizedBox(height: tokens.sectionGap),
           if (rows.isEmpty)
             Text(
               'Sin datos de ventas.',
               style: Theme.of(context).textTheme.bodySmall,
             )
           else
-            for (final row in rows) _ProductRow(row: row),
+            for (final row in rows)
+              _ProductRow(
+                row: row,
+                tokens: tokens,
+              ),
         ],
       ),
     );
@@ -703,15 +872,19 @@ class _TopProductsCard extends StatelessWidget {
 }
 
 class _ProductRow extends StatelessWidget {
-  const _ProductRow({required this.row});
+  const _ProductRow({
+    required this.row,
+    required this.tokens,
+  });
 
   final DashboardProductoVentaItem row;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: tokens.rowBottomSpacing),
       child: Row(
         children: [
           Expanded(
@@ -745,15 +918,20 @@ class _ProductRow extends StatelessWidget {
 }
 
 class _LowStockCard extends StatelessWidget {
-  const _LowStockCard({required this.resumen});
+  const _LowStockCard({
+    required this.resumen,
+    required this.tokens,
+  });
 
   final DashboardResumen? resumen;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     final rows =
         resumen?.productosMenosStock ?? const <DashboardProductoStockItem>[];
     return _DashboardCard(
+      tokens: tokens,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -761,16 +939,20 @@ class _LowStockCard extends StatelessWidget {
             title: 'Productos con menos stock',
             actionLabel: 'Detalle',
           ),
-          const SizedBox(height: defaultPadding),
+          SizedBox(height: tokens.sectionGap),
           _LowStockHeader(),
-          const SizedBox(height: 6),
+          SizedBox(height: tokens.smallGap),
           if (rows.isEmpty)
             Text(
               'Sin productos en lista.',
               style: Theme.of(context).textTheme.bodySmall,
             )
           else
-            for (final row in rows) _LowStockRow(row: row),
+            for (final row in rows)
+              _LowStockRow(
+                row: row,
+                tokens: tokens,
+              ),
         ],
       ),
     );
@@ -778,9 +960,13 @@ class _LowStockCard extends StatelessWidget {
 }
 
 class _LowStockRow extends StatelessWidget {
-  const _LowStockRow({required this.row});
+  const _LowStockRow({
+    required this.row,
+    required this.tokens,
+  });
 
   final DashboardProductoStockItem row;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
@@ -788,7 +974,7 @@ class _LowStockRow extends StatelessWidget {
     final actual = row.stockActual;
     final minimo = row.stockMinimo;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: tokens.rowBottomSpacing),
       child: Row(
         children: [
           Expanded(
@@ -872,25 +1058,29 @@ class _CardHeader extends StatelessWidget {
 }
 
 class _DashboardCard extends StatelessWidget {
-  const _DashboardCard({required this.child});
+  const _DashboardCard({
+    required this.child,
+    required this.tokens,
+  });
 
   final Widget child;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final surface = theme.colorScheme.surface;
     return Container(
-      padding: const EdgeInsets.all(defaultPadding),
+      padding: EdgeInsets.all(tokens.dashboardCardPadding),
       decoration: BoxDecoration(
         color: surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(tokens.dashboardCardRadius),
         border: Border.all(color: theme.colorScheme.outline.withAlpha(110)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(25),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+            blurRadius: tokens.dashboardCardShadowBlur,
+            offset: Offset(0, tokens.dashboardCardShadowOffsetY),
           ),
         ],
       ),
@@ -903,19 +1093,24 @@ class _StatusChip extends StatelessWidget {
   const _StatusChip({
     required this.label,
     required this.color,
+    required this.tokens,
   });
 
   final String label;
   final Color color;
+  final DashboardLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.statusChipHorizontalPadding,
+        vertical: tokens.statusChipVerticalPadding,
+      ),
       decoration: BoxDecoration(
         color: color.withAlpha(20),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(tokens.statusChipRadius),
         border: Border.all(color: color.withAlpha(120)),
       ),
       child: Text(
@@ -996,14 +1191,14 @@ class _LineChartPainter extends CustomPainter {
     final maxValue = values.reduce(max).toDouble();
     final range =
         (maxValue - minValue).abs() < 0.001 ? 1.0 : maxValue - minValue;
-    final stepX =
-        values.length == 1 ? 0.0 : size.width / (values.length - 1);
+    final stepX = values.length == 1 ? 0.0 : size.width / (values.length - 1);
 
     final linePath = Path();
     for (var i = 0; i < values.length; i++) {
       final x = stepX * i;
       final normalized = ((values[i] - minValue) / range).toDouble();
-      final y = (size.height - (normalized * (size.height - 16)) - 8).toDouble();
+      final y =
+          (size.height - (normalized * (size.height - 16)) - 8).toDouble();
       if (i == 0) {
         linePath.moveTo(x, y);
       } else {
@@ -1111,9 +1306,7 @@ List<double> _resolveCashflowValues(DashboardResumen? resumen) {
   if (cashflow.isEmpty) {
     return const [];
   }
-  return cashflow
-      .map((item) => item.neto ?? item.ingresos ?? 0)
-      .toList();
+  return cashflow.map((item) => item.neto ?? item.ingresos ?? 0).toList();
 }
 
 String _formatMoney(double? value) {

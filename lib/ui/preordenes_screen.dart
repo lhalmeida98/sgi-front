@@ -382,7 +382,8 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                               const SizedBox(width: defaultPadding),
                               Expanded(
                                 flex: 2,
-                                child: _TotalPanel(items: items, productos: productos),
+                                child: _TotalPanel(
+                                    items: items, productos: productos),
                               ),
                             ],
                           ),
@@ -431,7 +432,8 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                               const SizedBox(width: defaultPadding),
                               Expanded(
                                 flex: 2,
-                                child: _TotalPanel(items: items, productos: productos),
+                                child: _TotalPanel(
+                                    items: items, productos: productos),
                               ),
                             ],
                           ),
@@ -496,8 +498,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                   );
                   return;
                 }
-                final provider =
-                    providerContext.read<PreordenesProvider>();
+                final provider = providerContext.read<PreordenesProvider>();
                 final payload = Preorden(
                   id: preorden?.id,
                   empresaId: empresaId!,
@@ -523,8 +524,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                 if (!ok) {
                   showAppToast(
                     providerContext,
-                    provider.errorMessage ??
-                        'No se pudo guardar la preorden.',
+                    provider.errorMessage ?? 'No se pudo guardar la preorden.',
                     isError: true,
                   );
                   return;
@@ -533,9 +533,7 @@ class _PreordenesScreenState extends State<PreordenesScreen> {
                   Navigator.of(context).pop();
                   showAppToast(
                     providerContext,
-                    isEditing
-                        ? 'Preorden actualizada.'
-                        : 'Preorden creada.',
+                    isEditing ? 'Preorden actualizada.' : 'Preorden creada.',
                   );
                 }
               },
@@ -620,12 +618,17 @@ class _PreordenDatosCard extends StatelessWidget {
                   const SizedBox(height: defaultPadding),
                   canSelectEmpresa
                       ? DropdownButtonFormField<int>(
+                          isExpanded: true,
                           value: empresaId,
                           items: empresas
                               .map(
                                 (empresa) => DropdownMenuItem(
                                   value: empresa.id,
-                                  child: Text(empresa.razonSocial),
+                                  child: Text(
+                                    empresa.razonSocial,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -659,12 +662,17 @@ class _PreordenDatosCard extends StatelessWidget {
                         ),
                   const SizedBox(height: defaultPadding / 2),
                   DropdownButtonFormField<int>(
+                    isExpanded: true,
                     value: clienteId,
                     items: clientes
                         .map(
                           (cliente) => DropdownMenuItem(
                             value: cliente.id,
-                            child: Text(cliente.razonSocial),
+                            child: Text(
+                              cliente.razonSocial,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(),
@@ -684,24 +692,31 @@ class _PreordenDatosCard extends StatelessWidget {
                       Expanded(
                         child: TextFormField(
                           controller: monedaController,
-                          decoration: const InputDecoration(labelText: 'Moneda'),
+                          decoration:
+                              const InputDecoration(labelText: 'Moneda'),
                         ),
                       ),
                       const SizedBox(width: defaultPadding / 2),
                       Expanded(
                         child: DropdownButtonFormField<int>(
+                          isExpanded: true,
                           value: selectedBodegaId,
                           items: availableBodegas
                               .map(
                                 (bodega) => DropdownMenuItem(
                                   value: bodega.id,
-                                  child: Text(bodega.nombre),
+                                  child: Text(
+                                    bodega.nombre,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               )
                               .toList(),
                           onChanged:
                               availableBodegas.isEmpty ? null : onBodegaChanged,
-                          decoration: const InputDecoration(labelText: 'Bodega'),
+                          decoration:
+                              const InputDecoration(labelText: 'Bodega'),
                         ),
                       ),
                     ],
@@ -830,9 +845,9 @@ class _ItemsTableState extends State<_ItemsTable> {
     if (hasSelected) {
       return productos;
     }
-    final selected = widget.productos
-        .cast<Producto?>()
-        .firstWhere((producto) => producto?.id == selectedId, orElse: () => null);
+    final selected = widget.productos.cast<Producto?>().firstWhere(
+        (producto) => producto?.id == selectedId,
+        orElse: () => null);
     if (selected == null) {
       return productos;
     }
@@ -865,8 +880,8 @@ class _ItemsTableState extends State<_ItemsTable> {
         )
             ? item.bodegaId
             : null;
-        final totalLinea = (producto.precioUnitario * item.cantidad) -
-            item.descuento;
+        final totalLinea =
+            (producto.precioUnitario * item.cantidad) - item.descuento;
         return Padding(
           padding: const EdgeInsets.only(bottom: defaultPadding / 2),
           child: SingleChildScrollView(
@@ -906,12 +921,17 @@ class _ItemsTableState extends State<_ItemsTable> {
                 SizedBox(
                   width: 200,
                   child: DropdownButtonFormField<int>(
+                    isExpanded: true,
                     value: dropdownBodegaId,
                     items: availableBodegas
                         .map(
                           (bodega) => DropdownMenuItem(
                             value: bodega.id,
-                            child: Text(bodega.nombre),
+                            child: Text(
+                              bodega.nombre,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(),

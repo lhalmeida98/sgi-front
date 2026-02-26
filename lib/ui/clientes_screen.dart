@@ -144,11 +144,13 @@ class _ClientesScreenState extends State<ClientesScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: tipoIdentificacion,
                         items: const [
                           DropdownMenuItem(value: '05', child: Text('Cedula')),
                           DropdownMenuItem(value: '04', child: Text('RUC')),
-                          DropdownMenuItem(value: '06', child: Text('Pasaporte')),
+                          DropdownMenuItem(
+                              value: '06', child: Text('Pasaporte')),
                         ],
                         onChanged: (value) {
                           if (value != null) {
@@ -242,8 +244,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 }
                 final creditoDiasValue =
                     int.tryParse(creditoDiasController.text.trim());
-                final provider =
-                    providerContext.read<ClientesProvider>();
+                final provider = providerContext.read<ClientesProvider>();
                 final payload = Cliente(
                   id: cliente?.id,
                   tipoIdentificacion: tipoIdentificacion,
@@ -259,8 +260,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 if (!ok) {
                   showAppToast(
                     providerContext,
-                    provider.errorMessage ??
-                        'No se pudo guardar el cliente.',
+                    provider.errorMessage ?? 'No se pudo guardar el cliente.',
                     isError: true,
                   );
                   return;
@@ -269,9 +269,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   Navigator.of(context).pop();
                   showAppToast(
                     providerContext,
-                    isEditing
-                        ? 'Cliente actualizado.'
-                        : 'Cliente registrado.',
+                    isEditing ? 'Cliente actualizado.' : 'Cliente registrado.',
                   );
                 }
               },

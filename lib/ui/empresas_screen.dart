@@ -55,9 +55,8 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
               .map((item) => item.empresa)
               .whereType<Empresa>()
               .toList();
-          final empresas = userEmpresas.isNotEmpty
-              ? userEmpresas
-              : provider.empresas;
+          final empresas =
+              userEmpresas.isNotEmpty ? userEmpresas : provider.empresas;
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(defaultPadding),
@@ -170,8 +169,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
         return;
       }
       setState(() {
-        _usuarioEmpresasError =
-            'No se pudo cargar empresas del usuario.';
+        _usuarioEmpresasError = 'No se pudo cargar empresas del usuario.';
         _usuarioEmpresas = [];
       });
     } finally {
@@ -223,6 +221,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           value: ambiente,
                           items: const [
                             DropdownMenuItem(
@@ -239,10 +238,12 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                               setState(() => ambiente = value);
                             }
                           },
-                          decoration: const InputDecoration(labelText: 'Ambiente'),
+                          decoration:
+                              const InputDecoration(labelText: 'Ambiente'),
                         ),
                         const SizedBox(height: defaultPadding / 2),
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           value: tipoEmision,
                           items: const [
                             DropdownMenuItem(
@@ -465,8 +466,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                 if (!mounted) {
                   return;
                 }
-                final provider =
-                    providerContext.read<EmpresasProvider>();
+                final provider = providerContext.read<EmpresasProvider>();
                 final creditoDiasValue =
                     int.tryParse(creditoDiasController.text.trim());
                 final payload = Empresa(
@@ -532,8 +532,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                   if (!ok) {
                     showAppToast(
                       providerContext,
-                      provider.errorMessage ??
-                          'No se pudo cargar la firma.',
+                      provider.errorMessage ?? 'No se pudo cargar la firma.',
                       isError: true,
                     );
                     return;
@@ -544,9 +543,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                   Navigator.of(context).pop();
                   showAppToast(
                     providerContext,
-                    isEditing
-                        ? 'Empresa actualizada.'
-                        : 'Empresa registrada.',
+                    isEditing ? 'Empresa actualizada.' : 'Empresa registrada.',
                   );
                 }
               },
@@ -647,8 +644,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                   );
                   return;
                 }
-                final provider =
-                    providerContext.read<EmpresasProvider>();
+                final provider = providerContext.read<EmpresasProvider>();
                 final ok = await provider.uploadFirma(
                   empresaId: empresa.id!,
                   bytes: selectedFile!.bytes!,
@@ -661,8 +657,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                 } else if (context.mounted) {
                   showAppToast(
                     providerContext,
-                    provider.errorMessage ??
-                        'No se pudo cargar la firma.',
+                    provider.errorMessage ?? 'No se pudo cargar la firma.',
                     isError: true,
                   );
                 }
@@ -743,8 +738,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                   );
                   return;
                 }
-                final provider =
-                    providerContext.read<EmpresasProvider>();
+                final provider = providerContext.read<EmpresasProvider>();
                 final ok = await provider.uploadLogo(
                   empresaId: empresa.id!,
                   bytes: selectedFile!.bytes!,
@@ -756,8 +750,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                 } else if (context.mounted) {
                   showAppToast(
                     providerContext,
-                    provider.errorMessage ??
-                        'No se pudo cargar el logo.',
+                    provider.errorMessage ?? 'No se pudo cargar el logo.',
                     isError: true,
                   );
                 }
@@ -880,12 +873,13 @@ class _EmpresasList extends StatelessWidget {
                         ),
                         child: Text(
                           '${items.length} registradas',
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                     ],
@@ -923,7 +917,8 @@ class _EmpresasList extends StatelessWidget {
                                 DataCell(
                                   _AmbienteBadge(ambiente: empresa.ambiente),
                                 ),
-                                DataCell(Text('${empresa.estab}-${empresa.ptoEmi}')),
+                                DataCell(
+                                    Text('${empresa.estab}-${empresa.ptoEmi}')),
                                 DataCell(
                                   Text(
                                     empresa.creditoDiasDefault?.toString() ??
@@ -936,21 +931,17 @@ class _EmpresasList extends StatelessWidget {
                                     children: [
                                       IconButton(
                                         tooltip: 'Editar',
-                                        onPressed: () =>
-                                            onEditEmpresa(empresa),
-                                        icon:
-                                            const Icon(Icons.edit_outlined),
+                                        onPressed: () => onEditEmpresa(empresa),
+                                        icon: const Icon(Icons.edit_outlined),
                                       ),
                                       IconButton(
                                         tooltip: 'Subir firma',
-                                        onPressed: () =>
-                                            onUploadFirma(empresa),
+                                        onPressed: () => onUploadFirma(empresa),
                                         icon: const Icon(Icons.key),
                                       ),
                                       IconButton(
                                         tooltip: 'Subir logo',
-                                        onPressed: () =>
-                                            onUploadLogo(empresa),
+                                        onPressed: () => onUploadLogo(empresa),
                                         icon: const Icon(Icons.image_outlined),
                                       ),
                                     ],
