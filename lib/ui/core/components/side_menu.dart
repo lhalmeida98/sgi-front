@@ -154,13 +154,39 @@ class _SideMenuHeader extends StatelessWidget {
 
   final bool isCollapsed;
 
+  Widget _buildLogo() {
+    final asset = isCollapsed
+        ? 'assets/images/Logo_isotipo_tight.png'
+        : 'assets/images/Logo_sin_slogan_sin_fondo_tight.png';
+    final alignment = isCollapsed ? Alignment.center : Alignment.centerLeft;
+    final logoHeight = isCollapsed ? 36.0 : 68.0;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: Align(
+        key: ValueKey(asset),
+        alignment: alignment,
+        child: SizedBox(
+          height: logoHeight,
+          child: Image.asset(
+            asset,
+            fit: BoxFit.contain,
+            alignment: alignment,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final controller = context.read<MenuAppController>();
     return Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      height: isCollapsed ? 64 : 88,
+      padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 12 : 16),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: theme.colorScheme.outline.withAlpha(90)),
@@ -171,10 +197,7 @@ class _SideMenuHeader extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                Image.asset(
-                  "assets/images/logo.png",
-                  height: 36,
-                ),
+                _buildLogo(),
                 if (!isCollapsed) ...[
                   const SizedBox(width: 10),
                   /* Text(

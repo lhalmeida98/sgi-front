@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../resource/theme/dimens.dart';
+import '../ui/login/login_layout_tokens.dart';
 import '../states/auth_provider.dart';
 import '../states/theme_controller.dart';
 import '../ui/shared/feedback.dart';
+import '../utils/app_responsive.dart';
 import '../utils/responsive.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -31,6 +32,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final controller = context.watch<ThemeController>();
+    final responsive = AppResponsive.of(context);
+    final tokens = LoginLayoutTokens.fromResponsive(responsive);
     return Scaffold(
       body: Stack(
         children: [
@@ -49,11 +52,11 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           Positioned(
-            top: -120,
-            right: -120,
+            top: -tokens.topBlobOffset,
+            right: -tokens.topBlobOffset,
             child: Container(
-              height: 260,
-              width: 260,
+              height: tokens.topBlobSize,
+              width: tokens.topBlobSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: theme.colorScheme.primary.withAlpha(30),
@@ -61,11 +64,11 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           Positioned(
-            bottom: -140,
-            left: -140,
+            bottom: -tokens.bottomBlobOffset,
+            left: -tokens.bottomBlobOffset,
             child: Container(
-              height: 300,
-              width: 300,
+              height: tokens.bottomBlobSize,
+              width: tokens.bottomBlobSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: theme.colorScheme.primary.withAlpha(18),
@@ -75,11 +78,12 @@ class _LoginScreenState extends State<LoginScreen> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(defaultPadding),
+                padding: EdgeInsets.all(tokens.pagePadding),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1100),
+                  constraints: BoxConstraints(maxWidth: tokens.maxWidth),
                   child: Responsive(
                     mobile: _LoginCard(
+                      tokens: tokens,
                       formKey: _formKey,
                       identifierController: _identifierController,
                       passwordController: _passwordController,
@@ -94,11 +98,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     tablet: Row(
                       children: [
                         Expanded(
-                          child: _BrandPanel(),
+                          child: _BrandPanel(tokens: tokens),
                         ),
-                        const SizedBox(width: defaultPadding),
+                        SizedBox(width: tokens.tabletPanelGap),
                         Expanded(
                           child: _LoginCard(
+                            tokens: tokens,
                             formKey: _formKey,
                             identifierController: _identifierController,
                             passwordController: _passwordController,
@@ -117,12 +122,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         Expanded(
                           flex: 5,
-                          child: _BrandPanel(),
+                          child: _BrandPanel(tokens: tokens),
                         ),
-                        const SizedBox(width: defaultPadding * 2),
+                        SizedBox(width: tokens.desktopPanelGap),
                         Expanded(
                           flex: 4,
                           child: _LoginCard(
+                            tokens: tokens,
                             formKey: _formKey,
                             identifierController: _identifierController,
                             passwordController: _passwordController,
@@ -168,13 +174,17 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class _BrandPanel extends StatelessWidget {
+  const _BrandPanel({required this.tokens});
+
+  final LoginLayoutTokens tokens;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(defaultPadding * 2),
+      padding: EdgeInsets.all(tokens.panelPadding),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
         color: theme.colorScheme.surface.withAlpha(180),
         border: Border.all(color: theme.colorScheme.outline.withAlpha(120)),
       ),
@@ -185,39 +195,39 @@ class _BrandPanel extends StatelessWidget {
           Row(
             children: [
               Image.asset(
-                'assets/images/logo.png',
-                height: 38,
+                'assets/images/LogoVuala.png',
+                height: tokens.logoHeight,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: tokens.inlineGap),
               Text(
-                'SGI Facturacion',
+                'Facturación',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: defaultPadding),
+          SizedBox(height: tokens.sectionGap),
           Text(
-            'Accede al panel empresarial con control por empresa y roles.',
+            'Accede al panel principal.',
             style: theme.textTheme.bodyLarge,
           ),
-          const SizedBox(height: defaultPadding / 2),
+          SizedBox(height: tokens.sectionGap / 2),
           Text(
             'Emision de facturas, inventario y clientes en un solo lugar.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurface.withAlpha(160),
             ),
           ),
-          const SizedBox(height: defaultPadding * 2),
+          SizedBox(height: tokens.sectionGap * 2),
           Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: tokens.inlineGap,
+            runSpacing: tokens.inlineGap,
             children: [
-              _FeatureChip(label: 'Material 3'),
-              _FeatureChip(label: 'Multi-empresa'),
-              _FeatureChip(label: 'Seguridad JWT'),
-              _FeatureChip(label: 'Modo claro/oscuro'),
+              _FeatureChip(label: 'SGI', tokens: tokens),
+              _FeatureChip(label: 'Multi-empresa', tokens: tokens),
+              _FeatureChip(label: 'Seguridad JWT', tokens: tokens),
+              _FeatureChip(label: 'Modo claro/oscuro', tokens: tokens),
             ],
           ),
         ],
@@ -227,15 +237,22 @@ class _BrandPanel extends StatelessWidget {
 }
 
 class _FeatureChip extends StatelessWidget {
-  const _FeatureChip({required this.label});
+  const _FeatureChip({
+    required this.label,
+    required this.tokens,
+  });
 
   final String label;
+  final LoginLayoutTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.inlineGap,
+        vertical: tokens.chipVerticalPadding,
+      ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         color: theme.colorScheme.primary.withAlpha(20),
@@ -252,6 +269,7 @@ class _FeatureChip extends StatelessWidget {
 
 class _LoginCard extends StatelessWidget {
   const _LoginCard({
+    required this.tokens,
     required this.formKey,
     required this.identifierController,
     required this.passwordController,
@@ -262,6 +280,7 @@ class _LoginCard extends StatelessWidget {
     required this.isDark,
   });
 
+  final LoginLayoutTokens tokens;
   final GlobalKey<FormState> formKey;
   final TextEditingController identifierController;
   final TextEditingController passwordController;
@@ -276,15 +295,15 @@ class _LoginCard extends StatelessWidget {
     final theme = Theme.of(context);
     final authProvider = context.watch<AuthProvider>();
     return Container(
-      padding: const EdgeInsets.all(defaultPadding * 2),
+      padding: EdgeInsets.all(tokens.panelPadding),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(26),
-            blurRadius: 30,
-            offset: const Offset(0, 18),
+            blurRadius: tokens.cardShadowBlur,
+            offset: Offset(0, tokens.cardShadowOffsetY),
           ),
         ],
       ),
@@ -303,9 +322,8 @@ class _LoginCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: isDark
-                    ? 'Cambiar a modo claro'
-                    : 'Cambiar a modo oscuro',
+                tooltip:
+                    isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro',
                 onPressed: onToggleTheme,
                 icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
               ),
@@ -317,7 +335,7 @@ class _LoginCard extends StatelessWidget {
               color: theme.colorScheme.onSurface.withAlpha(160),
             ),
           ),
-          const SizedBox(height: defaultPadding * 1.5),
+          SizedBox(height: tokens.sectionGap * 1.5),
           Form(
             key: formKey,
             child: Column(
@@ -333,7 +351,7 @@ class _LoginCard extends StatelessWidget {
                     return null;
                   },
                 ),
-                const SizedBox(height: defaultPadding),
+                SizedBox(height: tokens.sectionGap),
                 TextFormField(
                   controller: passwordController,
                   obscureText: obscure,
@@ -359,16 +377,16 @@ class _LoginCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: defaultPadding),
+          SizedBox(height: tokens.sectionGap),
           Row(
             children: [
               Expanded(
                 child: FilledButton.icon(
                   onPressed: authProvider.isLoading ? null : onSubmit,
                   icon: authProvider.isLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
+                      ? SizedBox(
+                          width: tokens.loadingSize,
+                          height: tokens.loadingSize,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.login),
