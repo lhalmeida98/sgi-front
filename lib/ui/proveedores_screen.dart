@@ -644,7 +644,6 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
         TextEditingController(text: proveedor?.condicionesPago ?? 'CONTADO');
     var tipoIdentificacion = proveedor?.tipoIdentificacion ?? '04';
     var activo = proveedor?.activo ?? true;
-    final identificacionFocus = FocusNode();
     var isConsultingSri = false;
     var lastSriConsulta = '';
 
@@ -695,6 +694,9 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                 if (identificacion == lastSriConsulta) {
                   return;
                 }
+                if (!context.mounted) {
+                  return;
+                }
                 setState(() => isConsultingSri = true);
                 try {
                   final provider = providerContext.read<ProveedoresProvider>();
@@ -731,13 +733,6 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                 }
               }
 
-              if (!identificacionFocus.hasListeners) {
-                identificacionFocus.addListener(() {
-                  if (!identificacionFocus.hasFocus) {
-                    consultarSri();
-                  }
-                });
-              }
               return SizedBox(
                 width: 460,
                 child: Form(
@@ -769,7 +764,6 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                           Expanded(
                             child: TextFormField(
                               controller: identificacionController,
-                              focusNode: identificacionFocus,
                               decoration: const InputDecoration(
                                 labelText: 'Identificacion',
                               ),
@@ -941,7 +935,6 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
     telefonoController.dispose();
     direccionController.dispose();
     condicionesPagoController.dispose();
-    identificacionFocus.dispose();
   }
 
   Future<void> _confirmInactivate(
