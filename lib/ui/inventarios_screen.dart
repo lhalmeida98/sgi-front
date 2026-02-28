@@ -199,8 +199,7 @@ class _InventariosScreenState extends State<InventariosScreen> {
         return;
       }
       setState(() => isFetching = true);
-      final detalle =
-          await _inventariosProvider.fetchInventarioDetalle(
+      final detalle = await _inventariosProvider.fetchInventarioDetalle(
         productoId: productoId!,
         bodegaId: bodegaId!,
       );
@@ -209,13 +208,11 @@ class _InventariosScreenState extends State<InventariosScreen> {
         stockMinimoController.text = detalle.stockMinimo.toString();
         stockMaximoController.text = detalle.stockMaximo.toString();
         ubicacionController.text = detalle.ubicacion;
-        costoPromedioController.text =
-            detalle.costoPromedio.toStringAsFixed(2);
+        costoPromedioController.text = detalle.costoPromedio.toStringAsFixed(2);
       } else {
         showAppToast(
           providerContext,
-          _inventariosProvider.errorMessage ??
-              'Inventario no encontrado.',
+          _inventariosProvider.errorMessage ?? 'Inventario no encontrado.',
           isError: true,
         );
       }
@@ -261,8 +258,8 @@ class _InventariosScreenState extends State<InventariosScreen> {
                                   setState(() => productoId = value);
                                   await fetchDetalle(setState);
                                 },
-                                decoration:
-                                    const InputDecoration(labelText: 'Producto'),
+                                decoration: const InputDecoration(
+                                    labelText: 'Producto'),
                                 validator: (value) {
                                   if (value == null) {
                                     return 'Seleccione producto';
@@ -428,11 +425,11 @@ class _InventariosScreenState extends State<InventariosScreen> {
                 if (!formKey.currentState!.validate()) {
                   return;
                 }
-                final provider =
-                    providerContext.read<InventariosProvider>();
+                final provider = providerContext.read<InventariosProvider>();
                 final payload = Inventario(
                   id: inventario?.id,
                   productoId: productoId!,
+                  bodegaId: bodegaId,
                   stockActual:
                       int.tryParse(stockActualController.text.trim()) ?? 0,
                   stockMinimo:
@@ -443,7 +440,9 @@ class _InventariosScreenState extends State<InventariosScreen> {
                   costoPromedio:
                       double.tryParse(costoPromedioController.text.trim()) ?? 0,
                 );
-                final ok = await provider.upsertInventario(payload);
+                final ok = isEditing
+                    ? await provider.updateInventarioDetalle(payload)
+                    : await provider.upsertInventario(payload);
                 if (!ok) {
                   showAppToast(
                     providerContext,

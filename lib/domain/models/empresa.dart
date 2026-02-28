@@ -28,19 +28,58 @@ class Empresa {
   final int? creditoDiasDefault;
 
   factory Empresa.fromJson(Map<String, dynamic> json) {
+    final nested = json['empresa'];
+    final source =
+        nested is Map ? Map<String, dynamic>.from(nested) : <String, dynamic>{};
+
+    String pick(List<String> keys) {
+      for (final key in keys) {
+        final sourceValue = source[key];
+        if (sourceValue != null && sourceValue.toString().trim().isNotEmpty) {
+          return sourceValue.toString();
+        }
+        final jsonValue = json[key];
+        if (jsonValue != null && jsonValue.toString().trim().isNotEmpty) {
+          return jsonValue.toString();
+        }
+      }
+      return '';
+    }
+
     return Empresa(
-      id: parseInt(json['id'] ?? json['empresaId']),
-      ambiente: (json['ambiente'] ?? '').toString(),
-      tipoEmision: (json['tipoEmision'] ?? '').toString(),
-      razonSocial: (json['razonSocial'] ?? '').toString(),
-      nombreComercial: (json['nombreComercial'] ?? '').toString(),
-      ruc: (json['ruc'] ?? '').toString(),
-      dirMatriz: (json['dirMatriz'] ?? '').toString(),
-      estab: (json['estab'] ?? '').toString(),
-      ptoEmi: (json['ptoEmi'] ?? '').toString(),
-      secuencial: (json['secuencial'] ?? '').toString(),
-      creditoDiasDefault:
-          parseInt(json['creditoDiasDefault'] ?? json['creditoDias']),
+      id: parseInt(source['id'] ?? json['id'] ?? json['empresaId']),
+      ambiente: pick(['ambiente']),
+      tipoEmision: pick(['tipoEmision', 'tipo_emision']),
+      razonSocial: pick([
+        'razonSocial',
+        'razon_social',
+        'razon',
+        'nombre',
+      ]),
+      nombreComercial: pick([
+        'nombreComercial',
+        'nombre_comercial',
+        'nombreFantasia',
+        'nombre_fantasia',
+      ]),
+      ruc: pick([
+        'ruc',
+        'identificacion',
+        'numeroIdentificacion',
+        'numero_identificacion',
+      ]),
+      dirMatriz: pick([
+        'dirMatriz',
+        'direccionMatriz',
+        'direccion_matriz',
+      ]),
+      estab: pick(['estab', 'establecimiento']),
+      ptoEmi: pick(['ptoEmi', 'puntoEmision', 'punto_emision']),
+      secuencial: pick(['secuencial']),
+      creditoDiasDefault: parseInt(source['creditoDiasDefault'] ??
+          json['creditoDiasDefault'] ??
+          source['creditoDias'] ??
+          json['creditoDias']),
     );
   }
 
@@ -56,8 +95,7 @@ class Empresa {
       'estab': estab,
       'ptoEmi': ptoEmi,
       'secuencial': secuencial,
-      if (creditoDiasDefault != null)
-        'creditoDiasDefault': creditoDiasDefault,
+      if (creditoDiasDefault != null) 'creditoDiasDefault': creditoDiasDefault,
     };
   }
 }

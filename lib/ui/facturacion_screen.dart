@@ -184,6 +184,22 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
               : empresasProvider.empresas
                   .where((empresa) => empresa.id == empresaId)
                   .toList();
+          if (empresas.length == 1 && empresas.first.id != null) {
+            final onlyEmpresaId = empresas.first.id!;
+            if (_empresaId != onlyEmpresaId ||
+                _empresaIdProceso != onlyEmpresaId) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) {
+                  return;
+                }
+                setState(() {
+                  _empresaId = onlyEmpresaId;
+                  _empresaIdProceso = onlyEmpresaId;
+                  _empresaPrefillDone = true;
+                });
+              });
+            }
+          }
           final clientes = empresaId == null
               ? clientesProvider.clientes
               : clientesProvider.clientes
@@ -1700,11 +1716,11 @@ class _FacturarView extends StatelessWidget {
       (cliente) => cliente.id == clienteId,
       orElse: () => Cliente(
         id: 0,
-        tipoIdentificacion: '- ',
-        identificacion: '-',
+        tipoIdentificacion: '',
+        identificacion: '',
         razonSocial: 'Selecciona cliente',
-        email: '-',
-        direccion: '-',
+        email: '',
+        direccion: '',
       ),
     );
     final totals = _FacturacionTotals.fromData(items, productos, impuestos);
@@ -1913,6 +1929,25 @@ class _FacturaDatosCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final availableBodegas =
         bodegas.where((bodega) => bodega.id != null).toList();
+    final showEmpresaDropdown = canSelectEmpresa &&
+        empresas.where((empresa) => empresa.id != null).length > 1;
+    final selectedEmpresa = empresas.firstWhere(
+      (empresa) => empresa.id == empresaId,
+      orElse: () => empresas.isNotEmpty
+          ? empresas.first
+          : Empresa(
+              id: 0,
+              ambiente: '',
+              tipoEmision: '',
+              razonSocial: '',
+              nombreComercial: '',
+              ruc: '',
+              dirMatriz: '',
+              estab: '',
+              ptoEmi: '',
+              secuencial: '',
+            ),
+    );
     final selectedBodegaId = availableBodegas.any(
       (bodega) => bodega.id == bodegaId,
     )
@@ -1922,6 +1957,7 @@ class _FacturaDatosCard extends StatelessWidget {
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
         final cardWidth = maxWidth > 820 ? 820.0 : maxWidth;
+        final useCompactEmpresaLabel = maxWidth < 560;
         return Align(
           alignment: Alignment.topCenter,
           child: SizedBox(
@@ -1938,7 +1974,7 @@ class _FacturaDatosCard extends StatelessWidget {
                   Text('Datos de factura',
                       style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: defaultPadding),
-                  canSelectEmpresa
+                  showEmpresaDropdown
                       ? DropdownButtonFormField<int>(
                           isExpanded: true,
                           value: empresaId,
@@ -1947,7 +1983,10 @@ class _FacturaDatosCard extends StatelessWidget {
                                 (empresa) => DropdownMenuItem(
                                   value: empresa.id,
                                   child: Text(
-                                    empresa.razonSocial,
+                                    _empresaLabel(
+                                      empresa,
+                                      compact: useCompactEmpresaLabel,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1959,57 +1998,35 @@ class _FacturaDatosCard extends StatelessWidget {
                               const InputDecoration(labelText: 'Empresa'),
                         )
                       : TextFormField(
+                          key: ValueKey(
+                            'empresa-label-${selectedEmpresa.id}-${selectedEmpresa.ruc}-${selectedEmpresa.razonSocial}-${selectedEmpresa.nombreComercial}-$useCompactEmpresaLabel',
+                          ),
                           readOnly: true,
-                          initialValue: empresas
-                              .firstWhere(
-                                (empresa) => empresa.id == empresaId,
-                                orElse: () => empresas.isNotEmpty
-                                    ? empresas.first
-                                    : Empresa(
-                                        id: 0,
-                                        ambiente: '',
-                                        tipoEmision: '',
-                                        razonSocial: '-',
-                                        nombreComercial: '',
-                                        ruc: '',
-                                        dirMatriz: '',
-                                        estab: '',
-                                        ptoEmi: '',
-                                        secuencial: '',
-                                      ),
-                              )
-                              .razonSocial,
+                          initialValue: _empresaLabel(
+                            selectedEmpresa,
+                            compact: useCompactEmpresaLabel,
+                          ),
                           decoration:
                               const InputDecoration(labelText: 'Empresa'),
                         ),
                   const SizedBox(height: defaultPadding / 2),
-                  DropdownButtonFormField<int>(
-                    isExpanded: true,
-                    value: clienteId,
-                    items: clientes
-                        .map(
-                          (cliente) => DropdownMenuItem(
-                            value: cliente.id,
-                            child: Text(
-                              cliente.razonSocial,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: onClienteChanged,
-                    decoration: const InputDecoration(labelText: 'Cliente'),
+                  _ClienteAutocompleteField(
+                    clientes: clientes,
+                    clienteId: clienteId,
+                    onClienteChanged: onClienteChanged,
                   ),
                   const SizedBox(height: defaultPadding / 2),
                   Row(
                     children: [
                       Expanded(
                         child: TextFormField(
-                          initialValue: selectedCliente.identificacion,
+                          key: ValueKey(
+                            'cliente-ident-${selectedCliente.id}-${selectedCliente.identificacion}',
+                          ),
+                          initialValue: selectedCliente.identificacion.trim(),
                           readOnly: true,
                           decoration: const InputDecoration(
-                            labelText: 'Identificacion',
+                            labelText: 'Identificación',
                           ),
                         ),
                       ),
@@ -2149,6 +2166,214 @@ class _FacturaDatosCard extends StatelessWidget {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
     return '${date.year}-$month-$day';
+  }
+
+  String _empresaLabel(Empresa empresa, {bool compact = false}) {
+    final nombre = empresa.razonSocial.trim().isNotEmpty
+        ? empresa.razonSocial.trim()
+        : empresa.nombreComercial.trim();
+    final ruc = empresa.ruc.trim();
+    final fallback = (empresa.id ?? 0) > 0 ? 'Empresa ${empresa.id}' : '-';
+    if (compact) {
+      if (ruc.isNotEmpty) {
+        return ruc;
+      }
+      return nombre.isEmpty ? fallback : nombre;
+    }
+    if (ruc.isEmpty) {
+      return nombre.isEmpty ? fallback : nombre;
+    }
+    if (nombre.isEmpty) {
+      return ruc;
+    }
+    return '$ruc - $nombre';
+  }
+}
+
+class _ClienteAutocompleteField extends StatefulWidget {
+  const _ClienteAutocompleteField({
+    required this.clientes,
+    required this.clienteId,
+    required this.onClienteChanged,
+  });
+
+  final List<Cliente> clientes;
+  final int? clienteId;
+  final ValueChanged<int?> onClienteChanged;
+
+  @override
+  State<_ClienteAutocompleteField> createState() =>
+      _ClienteAutocompleteFieldState();
+}
+
+class _ClienteAutocompleteFieldState extends State<_ClienteAutocompleteField> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _syncSelectionLabel();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ClienteAutocompleteField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.clienteId != widget.clienteId || !_focusNode.hasFocus) {
+      _syncSelectionLabel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _syncSelectionLabel() {
+    final selected = widget.clientes.cast<Cliente?>().firstWhere(
+          (cliente) => cliente?.id == widget.clienteId,
+          orElse: () => null,
+        );
+    final text = selected == null ? '' : _clienteDisplayLabel(selected);
+    if (_controller.text == text) {
+      return;
+    }
+    _controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
+  Iterable<Cliente> _buildOptions(String rawQuery) {
+    final query = rawQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      return widget.clientes.take(8);
+    }
+    return widget.clientes.where((cliente) {
+      final nombre = cliente.razonSocial.toLowerCase();
+      final identificacion = cliente.identificacion.toLowerCase();
+      final email = cliente.email.toLowerCase();
+      return nombre.contains(query) ||
+          identificacion.contains(query) ||
+          email.contains(query);
+    }).take(8);
+  }
+
+  String _clienteDisplayLabel(Cliente cliente) {
+    final nombre = cliente.razonSocial.trim();
+    if (nombre.isNotEmpty) {
+      return nombre;
+    }
+    final identificacion = cliente.identificacion.trim();
+    if (identificacion.isNotEmpty) {
+      return identificacion;
+    }
+    final email = cliente.email.trim();
+    if (email.isNotEmpty) {
+      return email;
+    }
+    return 'Cliente sin nombre';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RawAutocomplete<Cliente>(
+      textEditingController: _controller,
+      focusNode: _focusNode,
+      displayStringForOption: _clienteDisplayLabel,
+      optionsBuilder: (value) => _buildOptions(value.text),
+      onSelected: (cliente) {
+        final selectedId = cliente.id;
+        if (selectedId == null) {
+          return;
+        }
+        widget.onClienteChanged(selectedId);
+        _syncSelectionLabel();
+      },
+      fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          decoration: const InputDecoration(
+            labelText: 'Cliente',
+            prefixIcon: Icon(Icons.search),
+          ),
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => onSubmit(),
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        final theme = Theme.of(context);
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 6,
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.all(Radius.circular(10)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxHeight: 260,
+                minWidth: 280,
+              ),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shrinkWrap: true,
+                itemCount: options.length,
+                separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  color: theme.dividerColor.withAlpha(90),
+                ),
+                itemBuilder: (context, index) {
+                  final cliente = options.elementAt(index);
+                  final nombre = cliente.razonSocial.trim();
+                  final identificacion = cliente.identificacion.trim();
+                  return InkWell(
+                    onTap: () => onSelected(cliente),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _clienteDisplayLabel(cliente),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          Text(
+                            identificacion.isEmpty
+                                ? '-'
+                                : 'Identificación: $identificacion',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withAlpha(150),
+                            ),
+                          ),
+                          if (nombre.isEmpty && cliente.email.trim().isNotEmpty)
+                            Text(
+                              cliente.email.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color:
+                                    theme.colorScheme.onSurface.withAlpha(150),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -3283,7 +3508,11 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                     ],
                   ),
                   const SizedBox(height: defaultPadding),
-                  widget.canSelectEmpresa
+                  widget.canSelectEmpresa &&
+                          widget.empresas
+                                  .where((empresa) => empresa.id != null)
+                                  .length >
+                              1
                       ? DropdownButtonFormField<int>(
                           isExpanded: true,
                           value: widget.empresaId,
@@ -3292,7 +3521,7 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                 (empresa) => DropdownMenuItem(
                                   value: empresa.id,
                                   child: Text(
-                                    empresa.razonSocial,
+                                    _empresaLabel(empresa),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -3305,25 +3534,25 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                         )
                       : TextFormField(
                           readOnly: true,
-                          initialValue: widget.empresas
-                              .firstWhere(
-                                (empresa) => empresa.id == widget.empresaId,
-                                orElse: () => widget.empresas.isNotEmpty
-                                    ? widget.empresas.first
-                                    : Empresa(
-                                        id: 0,
-                                        ambiente: '',
-                                        tipoEmision: '',
-                                        razonSocial: '-',
-                                        nombreComercial: '',
-                                        ruc: '',
-                                        dirMatriz: '',
-                                        estab: '',
-                                        ptoEmi: '',
-                                        secuencial: '',
-                                      ),
-                              )
-                              .razonSocial,
+                          initialValue: _empresaLabel(
+                            widget.empresas.firstWhere(
+                              (empresa) => empresa.id == widget.empresaId,
+                              orElse: () => widget.empresas.isNotEmpty
+                                  ? widget.empresas.first
+                                  : Empresa(
+                                      id: 0,
+                                      ambiente: '',
+                                      tipoEmision: '',
+                                      razonSocial: '-',
+                                      nombreComercial: '',
+                                      ruc: '',
+                                      dirMatriz: '',
+                                      estab: '',
+                                      ptoEmi: '',
+                                      secuencial: '',
+                                    ),
+                            ),
+                          ),
                           decoration:
                               const InputDecoration(labelText: 'Empresa'),
                         ),
@@ -3763,6 +3992,21 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
     }
     final range = _dateRange ?? _defaultRange();
     await widget.onFetch(range, _page, _pageSize);
+  }
+
+  String _empresaLabel(Empresa empresa) {
+    final nombre = empresa.razonSocial.trim().isNotEmpty
+        ? empresa.razonSocial.trim()
+        : empresa.nombreComercial.trim();
+    final ruc = empresa.ruc.trim();
+    final fallback = (empresa.id ?? 0) > 0 ? 'Empresa ${empresa.id}' : '-';
+    if (ruc.isEmpty) {
+      return nombre.isEmpty ? fallback : nombre;
+    }
+    if (nombre.isEmpty) {
+      return ruc;
+    }
+    return '$ruc - $nombre';
   }
 
   DateTimeRange _defaultRange() {

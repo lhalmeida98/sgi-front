@@ -39,6 +39,20 @@ class InventariosProvider extends BaseProvider {
     }
   }
 
+  Future<bool> updateInventarioDetalle(Inventario inventario) async {
+    setLoading(true);
+    try {
+      await _service.updateInventarioDetalle(inventario);
+      await fetchInventarios();
+      return true;
+    } catch (error) {
+      setError(resolveError(error));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   Future<Inventario?> fetchInventarioDetalle({
     required int productoId,
     required int bodegaId,
@@ -81,8 +95,7 @@ class InventariosProvider extends BaseProvider {
   Future<void> fetchProductosDisponibles(int bodegaId) async {
     setLoading(true);
     try {
-      productosDisponibles =
-          await _service.fetchProductosDisponibles(bodegaId);
+      productosDisponibles = await _service.fetchProductosDisponibles(bodegaId);
       productosDisponiblesBodegaId = bodegaId;
       _disponiblesCache.removeWhere(
         (_, value) => value.bodegaId == bodegaId,

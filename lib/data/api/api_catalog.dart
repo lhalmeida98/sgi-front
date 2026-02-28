@@ -50,10 +50,15 @@ final List<ApiModule> apiModules = [
         payload: '''
 {
   "codigo": "P-001",
-  "descripcion": "Arroz 1kg",
-  "precioUnitario": 1.50,
+  "descripcion": "Producto demo",
+  "precioUnitario": 10.50,
   "categoriaId": 1,
-  "impuestoId": 1
+  "impuestoId": 1,
+  "proveedorId": null,
+  "bodegaId": 1,
+  "costo": 7.25,
+  "vendible": true,
+  "codigoBarras": "1234567890"
 }
 ''',
       ),

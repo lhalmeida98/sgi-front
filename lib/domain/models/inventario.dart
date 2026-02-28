@@ -51,8 +51,8 @@ class Inventario {
       productoNombre: json['productoNombre']?.toString() ??
           json['producto']?['descripcion']?.toString(),
       bodegaId: parseInt(json['bodegaId']),
-      bodegaNombre:
-          json['bodegaNombre']?.toString() ?? json['bodega']?['nombre']?.toString(),
+      bodegaNombre: json['bodegaNombre']?.toString() ??
+          json['bodega']?['nombre']?.toString(),
       stockActual: parseInt(json['stockActual']) ?? 0,
       stockReservado: parseInt(json['stockReservado']),
       stockMinimo: parseInt(json['stockMinimo']) ?? 0,
@@ -74,6 +74,7 @@ class Inventario {
     return {
       if (id != null) 'id': id,
       'productoId': productoId,
+      if (bodegaId != null) 'bodegaId': bodegaId,
       'stockActual': stockActual,
       'stockMinimo': stockMinimo,
       'stockMaximo': stockMaximo,

@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../domain/models/bodega.dart';
 import '../domain/models/categoria.dart';
 import '../domain/models/impuesto.dart';
 import '../domain/models/producto.dart';
+import '../domain/models/proveedor.dart';
 import '../resource/theme/dimens.dart';
 import '../services/api_client.dart';
+import '../services/bodegas_service.dart';
 import '../services/categorias_service.dart';
 import '../services/impuestos_service.dart';
 import '../services/productos_service.dart';
+import '../services/proveedores_service.dart';
 import '../states/auth_provider.dart';
+import '../states/bodegas_provider.dart';
 import '../states/categorias_provider.dart';
 import '../states/impuestos_provider.dart';
 import '../states/productos_provider.dart';
+import '../states/proveedores_provider.dart';
 import '../ui/shared/feedback.dart';
 import '../ui/shared/section_header.dart';
 import '../utils/responsive.dart';
@@ -31,6 +38,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
   late final ProductosProvider _productosProvider;
   late final CategoriasProvider _categoriasProvider;
   late final ImpuestosProvider _impuestosProvider;
+  late final BodegasProvider _bodegasProvider;
+  late final ProveedoresProvider _proveedoresProvider;
 
   @override
   void initState() {
@@ -39,9 +48,13 @@ class _ProductosScreenState extends State<ProductosScreen> {
     _productosProvider = ProductosProvider(ProductosService(_client));
     _categoriasProvider = CategoriasProvider(CategoriasService(_client));
     _impuestosProvider = ImpuestosProvider(ImpuestosService(_client));
+    _bodegasProvider = BodegasProvider(BodegasService(_client));
+    _proveedoresProvider = ProveedoresProvider(ProveedoresService(_client));
     _productosProvider.fetchProductos();
     _categoriasProvider.fetchCategorias();
     _impuestosProvider.fetchImpuestos();
+    _bodegasProvider.fetchBodegas();
+    _proveedoresProvider.fetchProveedores();
   }
 
   @override
@@ -49,6 +62,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
     _productosProvider.dispose();
     _categoriasProvider.dispose();
     _impuestosProvider.dispose();
+    _bodegasProvider.dispose();
+    _proveedoresProvider.dispose();
     super.dispose();
   }
 
@@ -59,11 +74,13 @@ class _ProductosScreenState extends State<ProductosScreen> {
         ChangeNotifierProvider.value(value: _productosProvider),
         ChangeNotifierProvider.value(value: _categoriasProvider),
         ChangeNotifierProvider.value(value: _impuestosProvider),
+        ChangeNotifierProvider.value(value: _bodegasProvider),
+        ChangeNotifierProvider.value(value: _proveedoresProvider),
       ],
-      child:
-          Consumer3<ProductosProvider, CategoriasProvider, ImpuestosProvider>(
+      child: Consumer5<ProductosProvider, CategoriasProvider, ImpuestosProvider,
+          BodegasProvider, ProveedoresProvider>(
         builder: (context, productosProvider, categoriasProvider,
-            impuestosProvider, _) {
+            impuestosProvider, bodegasProvider, proveedoresProvider, _) {
           final authProvider = context.watch<AuthProvider>();
           final empresaId = authProvider.empresaId;
           final categorias = empresaId == null
@@ -88,6 +105,24 @@ class _ProductosScreenState extends State<ProductosScreen> {
                         impuesto.empresaId == empresaId,
                   )
                   .toList();
+          final bodegas = empresaId == null
+              ? bodegasProvider.bodegas
+              : bodegasProvider.bodegas
+                  .where(
+                    (bodega) =>
+                        bodega.empresaId == null ||
+                        bodega.empresaId == empresaId,
+                  )
+                  .toList();
+          final proveedores = empresaId == null
+              ? proveedoresProvider.proveedores
+              : proveedoresProvider.proveedores
+                  .where(
+                    (proveedor) =>
+                        proveedor.empresaId == null ||
+                        proveedor.empresaId == empresaId,
+                  )
+                  .toList();
           var productosBase = productosProvider.productos;
           if (empresaId != null) {
             productosBase = productosBase.where((producto) {
@@ -104,7 +139,9 @@ class _ProductosScreenState extends State<ProductosScreen> {
           final isMobile = Responsive.isMobile(context);
           final errorMessage = productosProvider.errorMessage ??
               categoriasProvider.errorMessage ??
-              impuestosProvider.errorMessage;
+              impuestosProvider.errorMessage ??
+              bodegasProvider.errorMessage ??
+              proveedoresProvider.errorMessage;
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(defaultPadding),
@@ -131,6 +168,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
                             context,
                             categorias: categorias,
                             impuestos: impuestos,
+                            bodegas: bodegas,
+                            proveedores: proveedores,
                           ),
                           icon: const Icon(Icons.add),
                         )
@@ -140,6 +179,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
                             context,
                             categorias: categorias,
                             impuestos: impuestos,
+                            bodegas: bodegas,
+                            proveedores: proveedores,
                           ),
                           icon: const Icon(Icons.add),
                           label: const Text('Crear producto'),
@@ -148,7 +189,9 @@ class _ProductosScreenState extends State<ProductosScreen> {
                   ),
                   if (productosProvider.isLoading ||
                       categoriasProvider.isLoading ||
-                      impuestosProvider.isLoading)
+                      impuestosProvider.isLoading ||
+                      bodegasProvider.isLoading ||
+                      proveedoresProvider.isLoading)
                     const Padding(
                       padding: EdgeInsets.only(top: defaultPadding / 2),
                       child: LinearProgressIndicator(),
@@ -174,6 +217,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
                       producto: producto,
                       categorias: categorias,
                       impuestos: impuestos,
+                      bodegas: bodegas,
+                      proveedores: proveedores,
                     ),
                     onToggleVendible: (producto, value) async {
                       final productoId = producto.id;
@@ -223,11 +268,21 @@ class _ProductosScreenState extends State<ProductosScreen> {
         .toList();
   }
 
+  double? _parseMoney(String value) {
+    final normalized = value.trim().replaceAll(',', '.');
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return double.tryParse(normalized);
+  }
+
   Future<void> _openProductoDialog(
     BuildContext providerContext, {
     Producto? producto,
     required List<Categoria> categorias,
     required List<Impuesto> impuestos,
+    required List<Bodega> bodegas,
+    required List<Proveedor> proveedores,
   }) async {
     final isEditing = producto != null;
     final formKey = GlobalKey<FormState>();
@@ -240,8 +295,13 @@ class _ProductosScreenState extends State<ProductosScreen> {
     final precioController = TextEditingController(
       text: producto != null ? producto.precioUnitario.toStringAsFixed(2) : '',
     );
+    final costoController = TextEditingController(
+      text: producto?.costo?.toStringAsFixed(2) ?? '',
+    );
     int? categoriaId = producto?.categoriaId;
     int? impuestoId = producto?.impuestoId;
+    int? bodegaId = producto?.bodegaId;
+    int? proveedorId = producto?.proveedorId;
     bool vendible = producto?.vendible ?? true;
 
     await showDialog<void>(
@@ -289,15 +349,23 @@ class _ProductosScreenState extends State<ProductosScreen> {
                       const SizedBox(height: defaultPadding / 2),
                       TextFormField(
                         controller: precioController,
-                        keyboardType: TextInputType.number,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[0-9.,]'),
+                          ),
+                        ],
                         decoration:
                             const InputDecoration(labelText: 'Precio unitario'),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Campo requerido';
                           }
-                          if (double.tryParse(value.trim()) == null) {
-                            return 'Debe ser numerico';
+                          final parsed = _parseMoney(value);
+                          if (parsed == null || parsed <= 0) {
+                            return 'Ingresa un valor valido';
                           }
                           return null;
                         },
@@ -358,6 +426,104 @@ class _ProductosScreenState extends State<ProductosScreen> {
                           return null;
                         },
                       ),
+                      if (!isEditing) ...[
+                        const SizedBox(height: defaultPadding / 2),
+                        DropdownButtonFormField<int?>(
+                          isExpanded: true,
+                          value: proveedorId,
+                          items: [
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('Sin proveedor'),
+                            ),
+                            ...proveedores
+                                .where((proveedor) => proveedor.id != null)
+                                .map(
+                                  (proveedor) => DropdownMenuItem<int?>(
+                                    value: proveedor.id,
+                                    child: Text(
+                                      proveedor.razonSocial.isNotEmpty
+                                          ? proveedor.razonSocial
+                                          : (proveedor.nombreComercial ??
+                                              'Proveedor'),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                          ],
+                          onChanged: (value) {
+                            setState(() => proveedorId = value);
+                          },
+                          decoration:
+                              const InputDecoration(labelText: 'Proveedor'),
+                        ),
+                        if (proveedores
+                            .where((proveedor) => proveedor.id != null)
+                            .isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'No hay proveedores registrados.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: defaultPadding / 2),
+                        DropdownButtonFormField<int>(
+                          isExpanded: true,
+                          value: bodegaId,
+                          items: bodegas
+                              .where((bodega) => bodega.id != null)
+                              .map(
+                                (bodega) => DropdownMenuItem(
+                                  value: bodega.id!,
+                                  child: Text(
+                                    bodega.nombre,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() => bodegaId = value);
+                          },
+                          decoration:
+                              const InputDecoration(labelText: 'Bodega'),
+                          validator: (value) {
+                            if (value == null) {
+                              return 'Seleccione bodega';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: defaultPadding / 2),
+                        TextFormField(
+                          controller: costoController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[0-9.,]'),
+                            ),
+                          ],
+                          decoration: const InputDecoration(labelText: 'Costo'),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Campo requerido';
+                            }
+                            final parsed = _parseMoney(value);
+                            if (parsed == null || parsed <= 0) {
+                              return 'Debe ser mayor que cero';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                       const SizedBox(height: defaultPadding / 2),
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
@@ -384,15 +550,20 @@ class _ProductosScreenState extends State<ProductosScreen> {
                   return;
                 }
                 final provider = providerContext.read<ProductosProvider>();
+                final precioUnitario =
+                    _parseMoney(precioController.text.trim()) ?? 0;
                 final payload = Producto(
                   id: producto?.id,
                   codigo: codigoController.text.trim(),
                   codigoBarras: codigoBarrasController.text.trim(),
                   descripcion: descripcionController.text.trim(),
-                  precioUnitario:
-                      double.tryParse(precioController.text.trim()) ?? 0,
+                  precioUnitario: precioUnitario,
                   categoriaId: categoriaId!,
                   impuestoId: impuestoId!,
+                  proveedorId: proveedorId,
+                  bodegaId: bodegaId,
+                  costo: _parseMoney(costoController.text.trim()) ??
+                      producto?.costo,
                   vendible: vendible,
                 );
                 final ok = isEditing
@@ -425,6 +596,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
     codigoBarrasController.dispose();
     descripcionController.dispose();
     precioController.dispose();
+    costoController.dispose();
   }
 }
 
@@ -469,6 +641,16 @@ class _ProductosList extends StatelessWidget {
     return '${impuesto.descripcion} (${impuesto.tarifa.toStringAsFixed(2)}%)';
   }
 
+  String _proveedorNombre(Producto producto) {
+    final value = producto.proveedorNombre?.trim() ?? '';
+    return value.isEmpty ? '-' : value;
+  }
+
+  String _proveedorRuc(Producto producto) {
+    final value = producto.proveedorRuc?.trim() ?? '';
+    return value.isEmpty ? '-' : value;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (productos.isEmpty) {
@@ -490,7 +672,7 @@ class _ProductosList extends StatelessWidget {
                 child: ListTile(
                   title: Text('${producto.codigo} - ${producto.descripcion}'),
                   subtitle: Text(
-                    'Precio: ${producto.precioUnitario.toStringAsFixed(2)} | ${_categoriaNombre(producto.categoriaId)}${producto.codigoBarras == null || producto.codigoBarras!.isEmpty ? '' : ' | Barra: ${producto.codigoBarras}'}',
+                    'Precio: ${producto.precioUnitario.toStringAsFixed(2)} | ${_categoriaNombre(producto.categoriaId)} | Prov: ${_proveedorNombre(producto)}${producto.codigoBarras == null || producto.codigoBarras!.isEmpty ? '' : ' | Barra: ${producto.codigoBarras}'}',
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -539,6 +721,8 @@ class _ProductosList extends StatelessWidget {
                     DataColumn(label: Text('Precio')),
                     DataColumn(label: Text('Categoria')),
                     DataColumn(label: Text('Impuesto')),
+                    DataColumn(label: Text('Proveedor')),
+                    DataColumn(label: Text('RUC proveedor')),
                     DataColumn(label: Text('Vendible')),
                     DataColumn(label: Text('Acciones')),
                   ],
@@ -558,6 +742,8 @@ class _ProductosList extends StatelessWidget {
                             DataCell(
                               Text(_impuestoNombre(producto.impuestoId)),
                             ),
+                            DataCell(Text(_proveedorNombre(producto))),
+                            DataCell(Text(_proveedorRuc(producto))),
                             DataCell(
                               Switch.adaptive(
                                 value: producto.vendible,

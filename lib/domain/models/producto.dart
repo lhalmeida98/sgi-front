@@ -10,6 +10,11 @@ class Producto {
     required this.precioUnitario,
     required this.categoriaId,
     required this.impuestoId,
+    this.proveedorId,
+    this.proveedorRuc,
+    this.proveedorNombre,
+    this.bodegaId,
+    this.costo,
     this.categoriaNombre,
     this.impuestoDescripcion,
     this.vendible = true,
@@ -23,6 +28,11 @@ class Producto {
   final double precioUnitario;
   final int categoriaId;
   final int impuestoId;
+  final int? proveedorId;
+  final String? proveedorRuc;
+  final String? proveedorNombre;
+  final int? bodegaId;
+  final double? costo;
   final String? categoriaNombre;
   final String? impuestoDescripcion;
   final bool vendible;
@@ -37,6 +47,14 @@ class Producto {
       precioUnitario: parseDouble(json['precioUnitario']) ?? 0,
       categoriaId: parseInt(json['categoriaId']) ?? 0,
       impuestoId: parseInt(json['impuestoId']) ?? 0,
+      proveedorId: parseInt(json['proveedorId'] ?? json['proveedor']?['id']),
+      proveedorRuc: json['proveedorRuc']?.toString() ??
+          json['proveedor']?['identificacion']?.toString(),
+      proveedorNombre: _resolveProveedorNombre(json),
+      bodegaId: parseInt(json['bodegaId'] ?? json['bodega']?['id']),
+      costo: parseDouble(
+        json['costo'] ?? json['costoUnitario'] ?? json['costoPromedio'],
+      ),
       categoriaNombre: json['categoriaNombre']?.toString() ??
           json['categoria']?['nombre']?.toString(),
       impuestoDescripcion: json['impuestoDescripcion']?.toString() ??
@@ -55,6 +73,9 @@ class Producto {
       'precioUnitario': precioUnitario,
       'categoriaId': categoriaId,
       'impuestoId': impuestoId,
+      'proveedorId': proveedorId,
+      if (bodegaId != null) 'bodegaId': bodegaId,
+      if (costo != null) 'costo': costo,
       'vendible': vendible,
     };
   }
@@ -68,6 +89,11 @@ class Producto {
     double? precioUnitario,
     int? categoriaId,
     int? impuestoId,
+    int? proveedorId,
+    String? proveedorRuc,
+    String? proveedorNombre,
+    int? bodegaId,
+    double? costo,
     String? categoriaNombre,
     String? impuestoDescripcion,
     bool? vendible,
@@ -81,9 +107,39 @@ class Producto {
       precioUnitario: precioUnitario ?? this.precioUnitario,
       categoriaId: categoriaId ?? this.categoriaId,
       impuestoId: impuestoId ?? this.impuestoId,
+      proveedorId: proveedorId ?? this.proveedorId,
+      proveedorRuc: proveedorRuc ?? this.proveedorRuc,
+      proveedorNombre: proveedorNombre ?? this.proveedorNombre,
+      bodegaId: bodegaId ?? this.bodegaId,
+      costo: costo ?? this.costo,
       categoriaNombre: categoriaNombre ?? this.categoriaNombre,
       impuestoDescripcion: impuestoDescripcion ?? this.impuestoDescripcion,
       vendible: vendible ?? this.vendible,
     );
+  }
+
+  static String? _resolveProveedorNombre(Map<String, dynamic> json) {
+    final proveedor = json['proveedor'];
+    if (proveedor is Map) {
+      final proveedorMap = Map<String, dynamic>.from(proveedor);
+      final razonSocial = proveedorMap['razonSocial']?.toString().trim() ?? '';
+      if (razonSocial.isNotEmpty) {
+        return razonSocial;
+      }
+      final nombreComercial =
+          proveedorMap['nombreComercial']?.toString().trim() ?? '';
+      if (nombreComercial.isNotEmpty) {
+        return nombreComercial;
+      }
+      final nombre = proveedorMap['nombre']?.toString().trim() ?? '';
+      if (nombre.isNotEmpty) {
+        return nombre;
+      }
+    }
+    final proveedorNombre = json['proveedorNombre']?.toString().trim() ?? '';
+    if (proveedorNombre.isNotEmpty) {
+      return proveedorNombre;
+    }
+    return null;
   }
 }

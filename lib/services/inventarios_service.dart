@@ -55,6 +55,28 @@ class InventariosService {
     return Inventario.fromJson(map);
   }
 
+  Future<Inventario> updateInventarioDetalle(Inventario inventario) async {
+    final bodegaId = inventario.bodegaId;
+    if (bodegaId == null) {
+      throw ApiException('Bodega requerida para editar inventario.');
+    }
+    final response = await _client.put(
+      '/api/inventarios/producto/${inventario.productoId}/bodega/$bodegaId',
+      body: {
+        'stockActual': inventario.stockActual,
+        'stockMinimo': inventario.stockMinimo,
+        'stockMaximo': inventario.stockMaximo,
+        'ubicacion': inventario.ubicacion,
+        'costoPromedio': inventario.costoPromedio,
+      },
+    );
+    final map = extractMap(response);
+    if (map.isEmpty) {
+      return inventario;
+    }
+    return Inventario.fromJson(map);
+  }
+
   Future<Inventario> fetchInventarioDetalle({
     required int productoId,
     required int bodegaId,
@@ -69,8 +91,8 @@ class InventariosService {
   Future<List<InventarioProductoDisponible>> fetchProductosDisponibles(
     int bodegaId,
   ) async {
-    final response =
-        await _client.get('/api/inventarios/bodega/$bodegaId/productos-disponibles');
+    final response = await _client
+        .get('/api/inventarios/bodega/$bodegaId/productos-disponibles');
     final items = extractList(response);
     return items.map(InventarioProductoDisponible.fromJson).toList();
   }
