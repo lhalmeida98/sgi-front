@@ -448,6 +448,11 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                           _clienteDireccionController.text = cliente.direccion;
                         });
                       },
+                      onCreateClienteRequested: (identificacion) =>
+                          _openCreateClienteDialog(
+                        context,
+                        identificacion: identificacion,
+                      ),
                       onMonedaChanged: (value) {
                         setState(() => _moneda = value);
                       },
@@ -519,6 +524,201 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     if (date != null) {
       setState(() => _fechaEmision = date);
     }
+  }
+
+  Future<int?> _openCreateClienteDialog(
+    BuildContext providerContext, {
+    required String identificacion,
+  }) async {
+    final formKey = GlobalKey<FormState>();
+    final cleanIdentificacion = identificacion.trim();
+    final identificacionController =
+        TextEditingController(text: cleanIdentificacion);
+    final razonSocialController = TextEditingController();
+    final emailController = TextEditingController();
+    final direccionController = TextEditingController();
+    final creditoDiasController = TextEditingController(text: '0');
+    var tipoIdentificacion = cleanIdentificacion.length >= 13 ? '04' : '05';
+    int? createdId;
+
+    await showDialog<void>(
+      context: providerContext,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Crear cliente'),
+          content: StatefulBuilder(
+            builder: (context, setLocalState) {
+              return SizedBox(
+                width: 420,
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        value: tipoIdentificacion,
+                        items: const [
+                          DropdownMenuItem(value: '05', child: Text('Cedula')),
+                          DropdownMenuItem(value: '04', child: Text('RUC')),
+                          DropdownMenuItem(
+                            value: '06',
+                            child: Text('Pasaporte'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setLocalState(() => tipoIdentificacion = value);
+                          }
+                        },
+                        decoration: const InputDecoration(labelText: 'Tipo'),
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: identificacionController,
+                        decoration:
+                            const InputDecoration(labelText: 'Identificacion'),
+                        keyboardType: TextInputType.number,
+                        validator: (value) => _validateClienteIdentificacion(
+                            value, tipoIdentificacion),
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: razonSocialController,
+                        decoration:
+                            const InputDecoration(labelText: 'Razon social'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Campo requerido';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: emailController,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Campo requerido';
+                          }
+                          if (!value.contains('@')) {
+                            return 'Email no valido';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: direccionController,
+                        decoration:
+                            const InputDecoration(labelText: 'Direccion'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Campo requerido';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: defaultPadding / 2),
+                      TextFormField(
+                        controller: creditoDiasController,
+                        decoration: const InputDecoration(
+                          labelText: 'Credito (dias)',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          final trimmed = value?.trim() ?? '';
+                          if (trimmed.isEmpty) {
+                            return null;
+                          }
+                          final parsed = int.tryParse(trimmed);
+                          if (parsed == null || parsed < 0) {
+                            return 'Debe ser un numero valido';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) {
+                  return;
+                }
+                final provider = providerContext.read<ClientesProvider>();
+                final payload = Cliente(
+                  tipoIdentificacion: tipoIdentificacion,
+                  identificacion: identificacionController.text.trim(),
+                  razonSocial: razonSocialController.text.trim(),
+                  email: emailController.text.trim(),
+                  direccion: direccionController.text.trim(),
+                  creditoDias:
+                      int.tryParse(creditoDiasController.text.trim()) ?? 0,
+                );
+                final ok = await provider.createCliente(payload);
+                if (!ok) {
+                  showAppToast(
+                    providerContext,
+                    provider.errorMessage ?? 'No se pudo crear el cliente.',
+                    isError: true,
+                  );
+                  return;
+                }
+                final createdIdent = identificacionController.text.trim();
+                Cliente? created;
+                for (final item in provider.clientes.reversed) {
+                  if (item.identificacion.trim() == createdIdent) {
+                    created = item;
+                    break;
+                  }
+                }
+                createdId = created?.id;
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+                showAppToast(providerContext, 'Cliente registrado.');
+              },
+              child: const Text('Crear'),
+            ),
+          ],
+        );
+      },
+    );
+
+    identificacionController.dispose();
+    razonSocialController.dispose();
+    emailController.dispose();
+    direccionController.dispose();
+    creditoDiasController.dispose();
+    return createdId;
+  }
+
+  String? _validateClienteIdentificacion(String? value, String tipo) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return 'Campo requerido';
+    }
+    if (tipo == '05' && trimmed.length != 10) {
+      return 'Debe tener 10 digitos';
+    }
+    if (tipo == '04' && trimmed.length != 13) {
+      return 'Debe tener 13 digitos';
+    }
+    if (tipo == '06' && trimmed.length < 5) {
+      return 'Minimo 5 caracteres';
+    }
+    return null;
   }
 
   Future<void> _submitFactura(BuildContext providerContext) async {
@@ -1670,6 +1870,7 @@ class _FacturarView extends StatelessWidget {
     required this.onEmpresaChanged,
     required this.onBodegaChanged,
     required this.onClienteChanged,
+    required this.onCreateClienteRequested,
     required this.onMonedaChanged,
     required this.onFechaChanged,
     required this.onItemsChanged,
@@ -1704,6 +1905,7 @@ class _FacturarView extends StatelessWidget {
   final ValueChanged<int?> onEmpresaChanged;
   final ValueChanged<int?> onBodegaChanged;
   final ValueChanged<int?> onClienteChanged;
+  final Future<int?> Function(String identificacion) onCreateClienteRequested;
   final ValueChanged<String> onMonedaChanged;
   final VoidCallback onFechaChanged;
   final VoidCallback onItemsChanged;
@@ -1752,6 +1954,7 @@ class _FacturarView extends StatelessWidget {
                 onEmpresaChanged: onEmpresaChanged,
                 onBodegaChanged: onBodegaChanged,
                 onClienteChanged: onClienteChanged,
+                onCreateClienteRequested: onCreateClienteRequested,
                 onMonedaChanged: onMonedaChanged,
                 onFechaChanged: onFechaChanged,
               ),
@@ -1790,6 +1993,7 @@ class _FacturarView extends StatelessWidget {
                   onEmpresaChanged: onEmpresaChanged,
                   onBodegaChanged: onBodegaChanged,
                   onClienteChanged: onClienteChanged,
+                  onCreateClienteRequested: onCreateClienteRequested,
                   onMonedaChanged: onMonedaChanged,
                   onFechaChanged: onFechaChanged,
                 ),
@@ -1832,6 +2036,7 @@ class _FacturarView extends StatelessWidget {
                   onEmpresaChanged: onEmpresaChanged,
                   onBodegaChanged: onBodegaChanged,
                   onClienteChanged: onClienteChanged,
+                  onCreateClienteRequested: onCreateClienteRequested,
                   onMonedaChanged: onMonedaChanged,
                   onFechaChanged: onFechaChanged,
                 ),
@@ -1897,6 +2102,7 @@ class _FacturaDatosCard extends StatelessWidget {
     required this.onEmpresaChanged,
     required this.onBodegaChanged,
     required this.onClienteChanged,
+    required this.onCreateClienteRequested,
     required this.onMonedaChanged,
     required this.onFechaChanged,
   });
@@ -1922,6 +2128,7 @@ class _FacturaDatosCard extends StatelessWidget {
   final ValueChanged<int?> onEmpresaChanged;
   final ValueChanged<int?> onBodegaChanged;
   final ValueChanged<int?> onClienteChanged;
+  final Future<int?> Function(String identificacion) onCreateClienteRequested;
   final ValueChanged<String> onMonedaChanged;
   final VoidCallback onFechaChanged;
 
@@ -2014,6 +2221,7 @@ class _FacturaDatosCard extends StatelessWidget {
                     clientes: clientes,
                     clienteId: clienteId,
                     onClienteChanged: onClienteChanged,
+                    onCreateClienteRequested: onCreateClienteRequested,
                   ),
                   const SizedBox(height: defaultPadding / 2),
                   Row(
@@ -2195,11 +2403,13 @@ class _ClienteAutocompleteField extends StatefulWidget {
     required this.clientes,
     required this.clienteId,
     required this.onClienteChanged,
+    required this.onCreateClienteRequested,
   });
 
   final List<Cliente> clientes;
   final int? clienteId;
   final ValueChanged<int?> onClienteChanged;
+  final Future<int?> Function(String identificacion) onCreateClienteRequested;
 
   @override
   State<_ClienteAutocompleteField> createState() =>
@@ -2277,6 +2487,93 @@ class _ClienteAutocompleteFieldState extends State<_ClienteAutocompleteField> {
     return 'Cliente sin nombre';
   }
 
+  String _onlyDigits(String value) {
+    final buffer = StringBuffer();
+    for (final rune in value.runes) {
+      final char = String.fromCharCode(rune);
+      if (RegExp(r'[0-9]').hasMatch(char)) {
+        buffer.write(char);
+      }
+    }
+    return buffer.toString();
+  }
+
+  Future<void> _handleSubmitted(String rawQuery) async {
+    final query = rawQuery.trim();
+    if (query.isEmpty) {
+      return;
+    }
+
+    final options = _buildOptions(query).toList();
+    if (options.isNotEmpty) {
+      Cliente? exact;
+      for (final cliente in options) {
+        if (cliente.identificacion.trim() == query) {
+          exact = cliente;
+          break;
+        }
+        if (_clienteDisplayLabel(cliente).toLowerCase() ==
+            query.toLowerCase()) {
+          exact = cliente;
+          break;
+        }
+      }
+      final selected = exact ?? options.first;
+      final selectedId = selected.id;
+      if (selectedId != null) {
+        widget.onClienteChanged(selectedId);
+        _focusNode.unfocus();
+      }
+      return;
+    }
+
+    final digits = _onlyDigits(query);
+    if (digits.length < 10) {
+      return;
+    }
+
+    // Close autocomplete overlay before opening dialogs to avoid element
+    // lifecycle assertion races in debug mode.
+    _focusNode.unfocus();
+    await Future<void>.delayed(Duration.zero);
+
+    if (!mounted) {
+      return;
+    }
+
+    final shouldCreate = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Cliente no encontrado'),
+          content: Text(
+            'No existe un cliente con la cédula "$digits". ¿Deseas crearlo ahora?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Crear cliente'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldCreate != true) {
+      return;
+    }
+
+    final createdId = await widget.onCreateClienteRequested(digits);
+    if (createdId != null) {
+      widget.onClienteChanged(createdId);
+      _focusNode.unfocus();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return RawAutocomplete<Cliente>(
@@ -2296,12 +2593,20 @@ class _ClienteAutocompleteFieldState extends State<_ClienteAutocompleteField> {
         return TextField(
           controller: controller,
           focusNode: focusNode,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Cliente',
-            prefixIcon: Icon(Icons.search),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: IconButton(
+              tooltip: 'Buscar/crear cliente',
+              onPressed: () => _handleSubmitted(controller.text),
+              icon: const Icon(Icons.person_add_alt_1),
+            ),
           ),
           textInputAction: TextInputAction.search,
-          onSubmitted: (_) => onSubmit(),
+          onSubmitted: (value) {
+            // We handle selection/creation flow manually.
+            _handleSubmitted(value);
+          },
         );
       },
       optionsViewBuilder: (context, onSelected, options) {

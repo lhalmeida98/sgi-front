@@ -127,7 +127,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
     final creditoDiasController = TextEditingController(
       text: cliente?.creditoDias?.toString() ?? '',
     );
-    var tipoIdentificacion = cliente?.tipoIdentificacion ?? '05';
+    var tipoIdentificacion = _tipoIdentificacionForForm(
+      cliente?.tipoIdentificacion,
+    );
 
     await showDialog<void>(
       context: providerContext,
@@ -302,6 +304,22 @@ class _ClientesScreenState extends State<ClientesScreen> {
       return 'Minimo 5 caracteres';
     }
     return null;
+  }
+
+  String _tipoIdentificacionForForm(String? value) {
+    final normalized = (value ?? '').trim().toUpperCase();
+    if (normalized == 'CEDULA' ||
+        normalized == 'CÉDULA' ||
+        normalized == '05') {
+      return '05';
+    }
+    if (normalized == 'RUC' || normalized == '04') {
+      return '04';
+    }
+    if (normalized == 'PASAPORTE' || normalized == '06') {
+      return '06';
+    }
+    return '05';
   }
 }
 
