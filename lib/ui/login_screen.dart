@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../ui/login/login_layout_tokens.dart';
+import '../services/auth_storage.dart';
 import '../states/auth_provider.dart';
 import '../states/theme_controller.dart';
 import '../ui/shared/feedback.dart';
@@ -20,12 +21,30 @@ class _LoginScreenState extends State<LoginScreen> {
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscure = true;
+  bool _rememberIdentifier = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreRememberedIdentifier();
+  }
 
   @override
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _restoreRememberedIdentifier() async {
+    final remembered = await AuthStorage.readRememberedIdentifier();
+    if (!mounted || remembered == null) {
+      return;
+    }
+    setState(() {
+      _rememberIdentifier = true;
+      _identifierController.text = remembered;
+    });
   }
 
   @override
@@ -87,9 +106,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       formKey: _formKey,
                       identifierController: _identifierController,
                       passwordController: _passwordController,
+                      rememberIdentifier: _rememberIdentifier,
                       obscure: _obscure,
                       onToggleObscure: () {
                         setState(() => _obscure = !_obscure);
+                      },
+                      onRememberIdentifierChanged: (value) {
+                        setState(() => _rememberIdentifier = value);
                       },
                       onSubmit: () => _handleLogin(context),
                       onToggleTheme: controller.toggleTheme,
@@ -107,9 +130,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             formKey: _formKey,
                             identifierController: _identifierController,
                             passwordController: _passwordController,
+                            rememberIdentifier: _rememberIdentifier,
                             obscure: _obscure,
                             onToggleObscure: () {
                               setState(() => _obscure = !_obscure);
+                            },
+                            onRememberIdentifierChanged: (value) {
+                              setState(() => _rememberIdentifier = value);
                             },
                             onSubmit: () => _handleLogin(context),
                             onToggleTheme: controller.toggleTheme,
@@ -132,9 +159,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             formKey: _formKey,
                             identifierController: _identifierController,
                             passwordController: _passwordController,
+                            rememberIdentifier: _rememberIdentifier,
                             obscure: _obscure,
                             onToggleObscure: () {
                               setState(() => _obscure = !_obscure);
+                            },
+                            onRememberIdentifierChanged: (value) {
+                              setState(() => _rememberIdentifier = value);
                             },
                             onSubmit: () => _handleLogin(context),
                             onToggleTheme: controller.toggleTheme,
@@ -159,10 +190,18 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     final authProvider = context.read<AuthProvider>();
+    final identifier = _identifierController.text.trim();
     final ok = await authProvider.login(
-      usuarioOrEmail: _identifierController.text.trim(),
+      usuarioOrEmail: identifier,
       password: _passwordController.text.trim(),
     );
+    if (ok) {
+      if (_rememberIdentifier) {
+        await AuthStorage.saveRememberedIdentifier(identifier);
+      } else {
+        await AuthStorage.clearRememberedIdentifier();
+      }
+    }
     if (!ok && context.mounted) {
       showAppToast(
         context,
@@ -273,8 +312,10 @@ class _LoginCard extends StatelessWidget {
     required this.formKey,
     required this.identifierController,
     required this.passwordController,
+    required this.rememberIdentifier,
     required this.obscure,
     required this.onToggleObscure,
+    required this.onRememberIdentifierChanged,
     required this.onSubmit,
     required this.onToggleTheme,
     required this.isDark,
@@ -284,8 +325,10 @@ class _LoginCard extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController identifierController;
   final TextEditingController passwordController;
+  final bool rememberIdentifier;
   final bool obscure;
   final VoidCallback onToggleObscure;
+  final ValueChanged<bool> onRememberIdentifierChanged;
   final VoidCallback onSubmit;
   final VoidCallback onToggleTheme;
   final bool isDark;
@@ -373,6 +416,16 @@ class _LoginCard extends StatelessWidget {
                     }
                     return null;
                   },
+                ),
+                SizedBox(height: tokens.sectionGap / 2),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  value: rememberIdentifier,
+                  onChanged: (value) =>
+                      onRememberIdentifierChanged(value ?? false),
+                  title: const Text('Recordar usuario'),
                 ),
               ],
             ),

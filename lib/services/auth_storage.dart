@@ -24,6 +24,7 @@ class AuthStorage {
   static const _empresaIdKey = 'auth_empresa_id';
   static const _usuarioIdKey = 'auth_usuario_id';
   static const _emailKey = 'auth_email';
+  static const _rememberedIdentifierKey = 'auth_remembered_identifier';
 
   static Future<void> save({
     required AuthInfo info,
@@ -85,6 +86,25 @@ class AuthStorage {
     await prefs.remove(_empresaIdKey);
     await prefs.remove(_usuarioIdKey);
     await prefs.remove(_emailKey);
+  }
+
+  static Future<String?> readRememberedIdentifier() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_rememberedIdentifierKey);
+    if (value == null || value.trim().isEmpty) {
+      return null;
+    }
+    return value;
+  }
+
+  static Future<void> saveRememberedIdentifier(String identifier) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_rememberedIdentifierKey, identifier.trim());
+  }
+
+  static Future<void> clearRememberedIdentifier() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_rememberedIdentifierKey);
   }
 
   static List<MenuAccion> _decodeAcciones(String raw) {
