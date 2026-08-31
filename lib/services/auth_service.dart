@@ -21,6 +21,7 @@ class AuthService {
     final response = await _client.post(
       '/api/auth/login',
       body: payload,
+      includeAuth: false,
     );
     final map = extractMap(response);
     return AuthInfo.fromJson(map);

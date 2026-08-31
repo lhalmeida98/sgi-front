@@ -1344,7 +1344,6 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     BuildContext context,
     Factura factura,
   ) async {
-    final theme = Theme.of(context);
     final numero = _facturaNumero(factura);
     final estado = _normalizeEstado(factura.estado);
     String? statusLabel;
@@ -1403,6 +1402,24 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         break;
     }
 
+    final detailLines = <String>[
+      if (estado.isNotEmpty) 'Estado: $estado',
+      if (sriConsulta != null && sriConsulta.isNotEmpty)
+        'Estado SRI: $sriConsulta',
+      if (sriAutorizacion != null && sriAutorizacion.isNotEmpty)
+        'Autorizacion SRI: $sriAutorizacion',
+      if (sriMensaje != null && sriMensaje.isNotEmpty)
+        'Mensaje SRI: $sriMensaje',
+      if (messageDetail != null &&
+          messageDetail.isNotEmpty &&
+          messageDetail != sriMensaje)
+        messageDetail,
+    ];
+    if (detailLines.isNotEmpty &&
+        (variant != FacturaNoticeVariant.success || sriMensaje != null)) {
+      detail = detailLines.join('\n');
+    }
+
     final actions = <FacturaNoticeAction>[];
     if (variant == FacturaNoticeVariant.success) {
       if (factura.id != null) {
@@ -1446,20 +1463,6 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
       );
     } else if (variant == FacturaNoticeVariant.warning &&
         estado == 'NO_AUTORIZADA') {
-      final detailLines = <String>[
-        'Estado: $estado',
-        if (sriConsulta != null && sriConsulta.isNotEmpty)
-          'Estado SRI: $sriConsulta',
-        if (sriAutorizacion != null && sriAutorizacion.isNotEmpty)
-          'Autorizacion SRI: $sriAutorizacion',
-        if (sriMensaje != null && sriMensaje.isNotEmpty)
-          'Mensaje SRI: $sriMensaje',
-        if (messageDetail != null &&
-            messageDetail.isNotEmpty &&
-            messageDetail != sriMensaje)
-          messageDetail,
-      ];
-      detail = detailLines.join('\n');
       actions.add(
         FacturaNoticeAction(
           label: 'Guardar como preorden',
@@ -3932,6 +3935,8 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                             final useMenuActions =
                                 !Responsive.isDesktop(context);
                             final actionsWidth = useMenuActions ? 200.0 : 360.0;
+                            final messageWidth =
+                                Responsive.isDesktop(context) ? 280.0 : 220.0;
                             return Align(
                               alignment: Alignment.topCenter,
                               child: SizedBox(
@@ -3945,6 +3950,12 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                       const DataColumn(label: Text('Fecha')),
                                       const DataColumn(label: Text('Monto')),
                                       const DataColumn(label: Text('Estado')),
+                                      DataColumn(
+                                        label: SizedBox(
+                                          width: messageWidth,
+                                          child: const Text('Mensaje SRI'),
+                                        ),
+                                      ),
                                       DataColumn(
                                         label: SizedBox(
                                           width: actionsWidth,
@@ -3985,6 +3996,16 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                   statusColor.withAlpha(40),
                                               labelStyle: TextStyle(
                                                 color: statusColor,
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            SizedBox(
+                                              width: messageWidth,
+                                              child: Text(
+                                                _sriMessage(factura),
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ),
@@ -4270,6 +4291,26 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
     return '\$${total.toStringAsFixed(2)}';
   }
 
+  String _sriMessage(Factura factura) {
+    final mensaje = factura.sriMensaje?.trim();
+    if (mensaje != null && mensaje.isNotEmpty) {
+      return mensaje;
+    }
+    final estadoAutorizacion = factura.sriEstadoAutorizacion?.trim();
+    if (estadoAutorizacion != null && estadoAutorizacion.isNotEmpty) {
+      return estadoAutorizacion;
+    }
+    final estadoConsulta = factura.sriEstadoConsulta?.trim();
+    if (estadoConsulta != null && estadoConsulta.isNotEmpty) {
+      return estadoConsulta;
+    }
+    final detalle = factura.mensaje?.trim();
+    if (detalle != null && detalle.isNotEmpty) {
+      return detalle;
+    }
+    return '-';
+  }
+
   String _dateRangeLabel() {
     final range = _dateRange ?? _defaultRange();
     return '${_formatFecha(range.start)} - ${_formatFecha(range.end)}';
@@ -4362,6 +4403,24 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                   _DetailRow(
                     label: 'Clave acceso',
                     value: factura.claveAcceso!,
+                  ),
+                if (factura.numeroAutorizacion != null)
+                  _DetailRow(
+                    label: 'Autorizacion',
+                    value: factura.numeroAutorizacion!,
+                  ),
+                if (factura.fechaAutorizacion != null)
+                  _DetailRow(
+                    label: 'Fecha autorizacion',
+                    value: DateFormat(
+                      'dd/MM/yyyy HH:mm:ss',
+                      'es_EC',
+                    ).format(factura.fechaAutorizacion!),
+                  ),
+                if (_sriMessage(factura) != '-')
+                  _DetailRow(
+                    label: 'Mensaje SRI',
+                    value: _sriMessage(factura),
                   ),
                 const SizedBox(height: defaultPadding),
                 Wrap(

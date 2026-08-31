@@ -37,11 +37,12 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
     Map<String, String>? query,
+    bool includeAuth = true,
   }) async {
     final uri = _buildUri(path, query);
     final response = await _client.post(
       uri,
-      headers: _jsonHeaders(),
+      headers: _jsonHeaders(includeAuth: includeAuth),
       body: jsonEncode(body ?? {}),
     );
     return _process(response);
@@ -118,14 +119,16 @@ class ApiClient {
     return query == null ? uri : uri.replace(queryParameters: query);
   }
 
-  Map<String, String> _jsonHeaders() {
+  Map<String, String> _jsonHeaders({bool includeAuth = true}) {
     final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-    final authHeader = AuthSession.authHeader;
-    if (authHeader != null) {
-      headers['Authorization'] = authHeader;
+    if (includeAuth) {
+      final authHeader = AuthSession.authHeader;
+      if (authHeader != null) {
+        headers['Authorization'] = authHeader;
+      }
     }
     return headers;
   }
@@ -207,7 +210,8 @@ class ApiClient {
   String? _extractErrorMessage(String body) {
     final decoded = _decodeBody(body);
     if (decoded is Map) {
-      final message = decoded['message'] ?? decoded['error'] ?? decoded['detalle'];
+      final message =
+          decoded['message'] ?? decoded['error'] ?? decoded['detalle'];
       if (message != null) {
         return message.toString();
       }

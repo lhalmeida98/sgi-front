@@ -12,6 +12,11 @@ class Empresa {
     required this.estab,
     required this.ptoEmi,
     required this.secuencial,
+    this.obligadoContabilidad = false,
+    this.regimenTributario = 'GENERAL',
+    this.contribuyenteEspecial = false,
+    this.numeroContribuyenteEspecial,
+    this.agenteRetencion = false,
     this.creditoDiasDefault,
   });
 
@@ -25,6 +30,11 @@ class Empresa {
   final String estab;
   final String ptoEmi;
   final String secuencial;
+  final bool obligadoContabilidad;
+  final String regimenTributario;
+  final bool contribuyenteEspecial;
+  final String? numeroContribuyenteEspecial;
+  final bool agenteRetencion;
   final int? creditoDiasDefault;
 
   factory Empresa.fromJson(Map<String, dynamic> json) {
@@ -76,6 +86,37 @@ class Empresa {
       estab: pick(['estab', 'establecimiento']),
       ptoEmi: pick(['ptoEmi', 'puntoEmision', 'punto_emision']),
       secuencial: pick(['secuencial']),
+      obligadoContabilidad: parseBool(source['obligadoContabilidad'] ??
+              json['obligadoContabilidad'] ??
+              source['obligado_contabilidad'] ??
+              json['obligado_contabilidad']) ??
+          false,
+      regimenTributario: pick(['regimenTributario', 'regimen_tributario'])
+              .trim()
+              .isNotEmpty
+          ? pick(['regimenTributario', 'regimen_tributario'])
+          : (parseBool(source['regimenRimpe'] ?? json['regimenRimpe']) ?? false)
+              ? 'RIMPE_EMPRENDEDOR'
+              : 'GENERAL',
+      contribuyenteEspecial: parseBool(source['contribuyenteEspecial'] ??
+              json['contribuyenteEspecial'] ??
+              source['contribuyente_especial'] ??
+              json['contribuyente_especial']) ??
+          false,
+      numeroContribuyenteEspecial:
+          pick(['numeroContribuyenteEspecial', 'numero_contribuyente_especial'])
+                  .trim()
+                  .isEmpty
+              ? null
+              : pick([
+                  'numeroContribuyenteEspecial',
+                  'numero_contribuyente_especial',
+                ]),
+      agenteRetencion: parseBool(source['agenteRetencion'] ??
+              json['agenteRetencion'] ??
+              source['agente_retencion'] ??
+              json['agente_retencion']) ??
+          false,
       creditoDiasDefault: parseInt(source['creditoDiasDefault'] ??
           json['creditoDiasDefault'] ??
           source['creditoDias'] ??
@@ -95,6 +136,13 @@ class Empresa {
       'estab': estab,
       'ptoEmi': ptoEmi,
       'secuencial': secuencial,
+      'obligadoContabilidad': obligadoContabilidad,
+      'regimenTributario': regimenTributario,
+      'regimenRimpe': regimenTributario.startsWith('RIMPE'),
+      'contribuyenteEspecial': contribuyenteEspecial,
+      if (numeroContribuyenteEspecial != null)
+        'numeroContribuyenteEspecial': numeroContribuyenteEspecial,
+      'agenteRetencion': agenteRetencion,
       if (creditoDiasDefault != null) 'creditoDiasDefault': creditoDiasDefault,
     };
   }

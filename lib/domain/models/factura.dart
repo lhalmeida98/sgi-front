@@ -13,6 +13,8 @@ class Factura {
     this.sriEstadoAutorizacion,
     this.sriMensaje,
     this.claveAcceso,
+    this.numeroAutorizacion,
+    this.fechaAutorizacion,
   });
 
   final int? id;
@@ -26,6 +28,8 @@ class Factura {
   final String? sriEstadoAutorizacion;
   final String? sriMensaje;
   final String? claveAcceso;
+  final String? numeroAutorizacion;
+  final DateTime? fechaAutorizacion;
 
   factory Factura.fromJson(Map<String, dynamic> json) {
     return Factura(
@@ -43,12 +47,14 @@ class Factura {
       sriEstadoConsulta:
           (json['sriEstado']?['estadoConsulta'] ?? json['estadoConsulta'])
               ?.toString(),
-      sriEstadoAutorizacion:
-          (json['sriEstado']?['estadoAutorizacion'] ?? json['estadoAutorizacion'])
-              ?.toString(),
+      sriEstadoAutorizacion: (json['sriEstado']?['estadoAutorizacion'] ??
+              json['estadoAutorizacion'])
+          ?.toString(),
       sriMensaje:
           (json['sriEstado']?['mensaje'] ?? json['mensajeSri'])?.toString(),
       claveAcceso: json['claveAcceso']?.toString(),
+      numeroAutorizacion: json['numeroAutorizacion']?.toString(),
+      fechaAutorizacion: _parseDate(json['fechaAutorizacion']),
     );
   }
 
@@ -64,7 +70,8 @@ class Factura {
         return razon.toString();
       }
     }
-    final nested = json['cliente']?['razonSocial'] ?? json['cliente']?['nombre'];
+    final nested =
+        json['cliente']?['razonSocial'] ?? json['cliente']?['nombre'];
     return nested?.toString();
   }
 

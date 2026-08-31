@@ -199,9 +199,16 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
     final creditoDiasController = TextEditingController(
       text: empresa?.creditoDiasDefault?.toString() ?? '',
     );
+    final numeroContribuyenteEspecialController = TextEditingController(
+      text: empresa?.numeroContribuyenteEspecial ?? '',
+    );
 
     var ambiente = empresa?.ambiente ?? 'PRUEBAS';
     var tipoEmision = empresa?.tipoEmision ?? 'NORMAL';
+    var obligadoContabilidad = empresa?.obligadoContabilidad ?? false;
+    var regimenTributario = empresa?.regimenTributario ?? 'GENERAL';
+    var contribuyenteEspecial = empresa?.contribuyenteEspecial ?? false;
+    var agenteRetencion = empresa?.agenteRetencion ?? false;
     PlatformFile? selectedFile;
     final claveController = TextEditingController();
 
@@ -382,6 +389,77 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                           },
                         ),
                         const SizedBox(height: defaultPadding),
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          initialValue: regimenTributario,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'GENERAL',
+                              child: Text('GENERAL'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'RIMPE_EMPRENDEDOR',
+                              child: Text('RIMPE EMPRENDEDOR'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'RIMPE_NEGOCIO_POPULAR',
+                              child: Text('RIMPE NEGOCIO POPULAR'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => regimenTributario = value);
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Regimen tributario',
+                          ),
+                        ),
+                        const SizedBox(height: defaultPadding / 2),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: obligadoContabilidad,
+                          title: const Text('Obligado a llevar contabilidad'),
+                          onChanged: (value) {
+                            setState(() => obligadoContabilidad = value);
+                          },
+                        ),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: contribuyenteEspecial,
+                          title: const Text('Contribuyente especial'),
+                          onChanged: (value) {
+                            setState(() => contribuyenteEspecial = value);
+                          },
+                        ),
+                        if (contribuyenteEspecial) ...[
+                          const SizedBox(height: defaultPadding / 2),
+                          TextFormField(
+                            controller: numeroContribuyenteEspecialController,
+                            decoration: const InputDecoration(
+                              labelText: 'Numero contribuyente especial',
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (value) {
+                              if (!contribuyenteEspecial) {
+                                return null;
+                              }
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Campo requerido';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: agenteRetencion,
+                          title: const Text('Agente de retencion'),
+                          onChanged: (value) {
+                            setState(() => agenteRetencion = value);
+                          },
+                        ),
+                        const SizedBox(height: defaultPadding),
                         Container(
                           padding: const EdgeInsets.all(defaultPadding),
                           decoration: BoxDecoration(
@@ -480,6 +558,13 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                   estab: estabController.text.trim(),
                   ptoEmi: ptoEmiController.text.trim(),
                   secuencial: secuencialController.text.trim(),
+                  obligadoContabilidad: obligadoContabilidad,
+                  regimenTributario: regimenTributario,
+                  contribuyenteEspecial: contribuyenteEspecial,
+                  numeroContribuyenteEspecial: contribuyenteEspecial
+                      ? numeroContribuyenteEspecialController.text.trim()
+                      : null,
+                  agenteRetencion: agenteRetencion,
                   creditoDiasDefault: creditoDiasValue,
                 );
 
@@ -562,6 +647,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
     ptoEmiController.dispose();
     secuencialController.dispose();
     creditoDiasController.dispose();
+    numeroContribuyenteEspecialController.dispose();
     claveController.dispose();
   }
 
@@ -806,7 +892,7 @@ class _EmpresasList extends StatelessWidget {
                 child: ListTile(
                   title: Text(empresa.razonSocial),
                   subtitle: Text(
-                    'RUC: ${empresa.ruc} • Credito ${empresa.creditoDiasDefault?.toString() ?? '-'} dias',
+                    'RUC: ${empresa.ruc} • ${_regimenLabel(empresa.regimenTributario)} • Contabilidad ${empresa.obligadoContabilidad ? 'SI' : 'NO'}',
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -905,6 +991,8 @@ class _EmpresasList extends StatelessWidget {
                         DataColumn(label: Text('Razon social')),
                         DataColumn(label: Text('Ambiente')),
                         DataColumn(label: Text('Estab/PtoEmi')),
+                        DataColumn(label: Text('Regimen')),
+                        DataColumn(label: Text('Contabilidad')),
                         DataColumn(label: Text('Credito default')),
                         DataColumn(label: Text('Acciones')),
                       ],
@@ -919,6 +1007,15 @@ class _EmpresasList extends StatelessWidget {
                                 ),
                                 DataCell(
                                     Text('${empresa.estab}-${empresa.ptoEmi}')),
+                                DataCell(
+                                  Text(
+                                      _regimenLabel(empresa.regimenTributario)),
+                                ),
+                                DataCell(
+                                  Text(empresa.obligadoContabilidad
+                                      ? 'SI'
+                                      : 'NO'),
+                                ),
                                 DataCell(
                                   Text(
                                     empresa.creditoDiasDefault?.toString() ??
@@ -960,6 +1057,17 @@ class _EmpresasList extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _regimenLabel(String value) {
+    switch (value) {
+      case 'RIMPE_EMPRENDEDOR':
+        return 'RIMPE emprendedor';
+      case 'RIMPE_NEGOCIO_POPULAR':
+        return 'RIMPE negocio popular';
+      default:
+        return 'General';
+    }
   }
 }
 

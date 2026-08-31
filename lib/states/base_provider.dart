@@ -26,6 +26,10 @@ class BaseProvider extends ChangeNotifier {
     if (error is ApiException) {
       return error.message;
     }
-    return error.toString();
+    final message = error.toString();
+    if (message.contains('Failed to fetch')) {
+      return 'No se pudo conectar al servidor. Revisa CORS/red en produccion.';
+    }
+    return message;
   }
 }
