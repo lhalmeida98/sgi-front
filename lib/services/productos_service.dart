@@ -1,11 +1,9 @@
-import '../domain/models/inventario.dart';
 import '../domain/models/producto.dart';
 import '../utils/json_utils.dart';
 import 'api_client.dart';
 import 'bodegas_service.dart';
 import 'categorias_service.dart';
 import 'impuestos_service.dart';
-import 'inventarios_service.dart';
 
 class ProductosService {
   ProductosService(this._client);
@@ -14,8 +12,6 @@ class ProductosService {
   late final CategoriasService _categoriasService = CategoriasService(_client);
   late final ImpuestosService _impuestosService = ImpuestosService(_client);
   late final BodegasService _bodegasService = BodegasService(_client);
-  late final InventariosService _inventariosService =
-      InventariosService(_client);
 
   Future<List<Producto>> fetchProductos() async {
     final response = await _client.get('/api/productos');
@@ -69,17 +65,6 @@ class ProductosService {
     if (productoId == null) {
       throw ApiException('No se pudo determinar el ID del producto creado.');
     }
-    await _inventariosService.upsertInventario(
-      Inventario(
-        productoId: productoId,
-        bodegaId: bodegaId,
-        stockActual: 0,
-        stockMinimo: 0,
-        stockMaximo: 0,
-        ubicacion: '',
-        costoPromedio: producto.costo!,
-      ),
-    );
     return created.copyWith(
       proveedorId: producto.proveedorId,
       bodegaId: bodegaId,

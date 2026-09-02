@@ -730,8 +730,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
       );
       return;
     }
-    if (_dirEstablecimientoController.text.trim().isEmpty ||
-        _codigoNumericoController.text.trim().isEmpty) {
+    if (_codigoNumericoController.text.trim().isEmpty) {
       showAppToast(
         providerContext,
         'Completa los datos de la factura.',
@@ -887,6 +886,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
       'fechaEmision': _formatDate(_fechaEmision ?? DateTime.now()),
       'moneda': _moneda,
       'codigoNumerico': _codigoNumericoController.text.trim(),
+      'observaciones': _observacionesController.text.trim(),
       'items': _items
           .map(
             (item) => {
@@ -2577,6 +2577,25 @@ class _ClienteAutocompleteFieldState extends State<_ClienteAutocompleteField> {
     }
   }
 
+  Future<void> _handleCreatePressed() async {
+    final digits = _onlyDigits(_controller.text.trim());
+    final identificacion = digits.length >= 10 ? digits : '';
+
+    _focusNode.unfocus();
+    await Future<void>.delayed(Duration.zero);
+
+    if (!mounted) {
+      return;
+    }
+
+    final createdId = await widget.onCreateClienteRequested(identificacion);
+    if (createdId != null) {
+      widget.onClienteChanged(createdId);
+      _syncSelectionLabel();
+      _focusNode.unfocus();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return RawAutocomplete<Cliente>(
@@ -2600,8 +2619,8 @@ class _ClienteAutocompleteFieldState extends State<_ClienteAutocompleteField> {
             labelText: 'Cliente',
             prefixIcon: const Icon(Icons.search),
             suffixIcon: IconButton(
-              tooltip: 'Buscar/crear cliente',
-              onPressed: () => _handleSubmitted(controller.text),
+              tooltip: 'Crear cliente',
+              onPressed: _handleCreatePressed,
               icon: const Icon(Icons.person_add_alt_1),
             ),
           ),
@@ -3934,7 +3953,7 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                 : maxWidth;
                             final useMenuActions =
                                 !Responsive.isDesktop(context);
-                            final actionsWidth = useMenuActions ? 200.0 : 360.0;
+                            final actionsWidth = useMenuActions ? 56.0 : 176.0;
                             final messageWidth =
                                 Responsive.isDesktop(context) ? 280.0 : 220.0;
                             return Align(
@@ -4094,39 +4113,39 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                         ],
                                                       ),
                                                     )
-                                                  : Wrap(
-                                                      spacing: 6,
-                                                      runSpacing: 6,
+                                                  : Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
                                                       children: [
-                                                        OutlinedButton.icon(
+                                                        _FacturaIconActionButton(
+                                                          tooltip: 'Ver',
+                                                          icon: Icons
+                                                              .visibility_outlined,
                                                           onPressed: () =>
                                                               _showFacturaDetalle(
                                                             context,
                                                             factura,
                                                           ),
-                                                          icon: const Icon(
-                                                            Icons
-                                                                .visibility_outlined,
-                                                          ),
-                                                          label: const Text(
-                                                            'Ver',
-                                                          ),
                                                         ),
-                                                        OutlinedButton.icon(
+                                                        const SizedBox(
+                                                            width: 4),
+                                                        _FacturaIconActionButton(
+                                                          tooltip: 'Reenviar',
+                                                          icon: Icons.refresh,
                                                           onPressed: canReenviar
                                                               ? () => widget
                                                                       .onReenviarFactura(
                                                                     facturaId!,
                                                                   )
                                                               : null,
-                                                          icon: const Icon(
-                                                            Icons.refresh,
-                                                          ),
-                                                          label: const Text(
-                                                            'Reenviar',
-                                                          ),
                                                         ),
-                                                        OutlinedButton.icon(
+                                                        const SizedBox(
+                                                            width: 4),
+                                                        _FacturaIconActionButton(
+                                                          tooltip:
+                                                              'Descargar PDF',
+                                                          icon: Icons
+                                                              .picture_as_pdf_outlined,
                                                           onPressed: facturaId ==
                                                                   null
                                                               ? null
@@ -4134,15 +4153,14 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                                       .onDescargarPdf(
                                                                     facturaId,
                                                                   ),
-                                                          icon: const Icon(
-                                                            Icons
-                                                                .picture_as_pdf_outlined,
-                                                          ),
-                                                          label: const Text(
-                                                            'PDF',
-                                                          ),
                                                         ),
-                                                        OutlinedButton.icon(
+                                                        const SizedBox(
+                                                            width: 4),
+                                                        _FacturaIconActionButton(
+                                                          tooltip:
+                                                              'Descargar XML',
+                                                          icon: Icons
+                                                              .code_outlined,
                                                           onPressed: facturaId ==
                                                                   null
                                                               ? null
@@ -4150,12 +4168,6 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                                                       .onDescargarXml(
                                                                     facturaId,
                                                                   ),
-                                                          icon: const Icon(
-                                                            Icons.code_outlined,
-                                                          ),
-                                                          label: const Text(
-                                                            'XML',
-                                                          ),
                                                         ),
                                                       ],
                                                     ),
@@ -4497,6 +4509,43 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
 }
 
 enum _FacturaAction { ver, reenviar, pdf, xml }
+
+class _FacturaIconActionButton extends StatelessWidget {
+  const _FacturaIconActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox.square(
+      dimension: 36,
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+        style: IconButton.styleFrom(
+          foregroundColor: theme.colorScheme.primary,
+          disabledForegroundColor: theme.disabledColor,
+          side: BorderSide(
+            color: theme.colorScheme.outline.withAlpha(90),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _StatCard extends StatelessWidget {
   const _StatCard({
