@@ -12,6 +12,7 @@ class Empresa {
     required this.estab,
     required this.ptoEmi,
     required this.secuencial,
+    this.secuencialPruebas,
     this.obligadoContabilidad = false,
     this.regimenTributario = 'GENERAL',
     this.contribuyenteEspecial = false,
@@ -30,6 +31,7 @@ class Empresa {
   final String estab;
   final String ptoEmi;
   final String secuencial;
+  final String? secuencialPruebas;
   final bool obligadoContabilidad;
   final String regimenTributario;
   final bool contribuyenteEspecial;
@@ -86,6 +88,10 @@ class Empresa {
       estab: pick(['estab', 'establecimiento']),
       ptoEmi: pick(['ptoEmi', 'puntoEmision', 'punto_emision']),
       secuencial: pick(['secuencial']),
+      secuencialPruebas:
+          pick(['secuencialPruebas', 'secuencial_pruebas']).trim().isEmpty
+              ? null
+              : pick(['secuencialPruebas', 'secuencial_pruebas']),
       obligadoContabilidad: parseBool(source['obligadoContabilidad'] ??
               json['obligadoContabilidad'] ??
               source['obligado_contabilidad'] ??
@@ -136,6 +142,7 @@ class Empresa {
       'estab': estab,
       'ptoEmi': ptoEmi,
       'secuencial': secuencial,
+      if (secuencialPruebas != null) 'secuencialPruebas': secuencialPruebas,
       'obligadoContabilidad': obligadoContabilidad,
       'regimenTributario': regimenTributario,
       'regimenRimpe': regimenTributario.startsWith('RIMPE'),

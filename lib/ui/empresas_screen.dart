@@ -196,6 +196,8 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
     final ptoEmiController = TextEditingController(text: empresa?.ptoEmi ?? '');
     final secuencialController =
         TextEditingController(text: empresa?.secuencial ?? '');
+    final secuencialPruebasController = TextEditingController(
+        text: empresa?.secuencialPruebas ?? empresa?.secuencial ?? '');
     final creditoDiasController = TextEditingController(
       text: empresa?.creditoDiasDefault?.toString() ?? '',
     );
@@ -360,8 +362,22 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                         const SizedBox(height: defaultPadding / 2),
                         TextFormField(
                           controller: secuencialController,
-                          decoration:
-                              const InputDecoration(labelText: 'Secuencial'),
+                          decoration: const InputDecoration(
+                            labelText: 'Secuencial produccion',
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Campo requerido';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: defaultPadding / 2),
+                        TextFormField(
+                          controller: secuencialPruebasController,
+                          decoration: const InputDecoration(
+                            labelText: 'Secuencial pruebas',
+                          ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return 'Campo requerido';
@@ -558,6 +574,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
                   estab: estabController.text.trim(),
                   ptoEmi: ptoEmiController.text.trim(),
                   secuencial: secuencialController.text.trim(),
+                  secuencialPruebas: secuencialPruebasController.text.trim(),
                   obligadoContabilidad: obligadoContabilidad,
                   regimenTributario: regimenTributario,
                   contribuyenteEspecial: contribuyenteEspecial,
@@ -646,6 +663,7 @@ class _EmpresasScreenState extends State<EmpresasScreen> {
     estabController.dispose();
     ptoEmiController.dispose();
     secuencialController.dispose();
+    secuencialPruebasController.dispose();
     creditoDiasController.dispose();
     numeroContribuyenteEspecialController.dispose();
     claveController.dispose();
@@ -924,73 +942,72 @@ class _EmpresasList extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
-        final cardWidth = maxWidth > 1100 ? 980.0 : maxWidth;
-        return Align(
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-            width: cardWidth,
-            child: Container(
-              padding: const EdgeInsets.all(defaultPadding),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.all(Radius.circular(10)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Listado de empresas',
-                        style: Theme.of(context).textTheme.titleMedium,
+        final minTableWidth = maxWidth < 1120 ? 1120.0 : maxWidth;
+        return SizedBox(
+          width: maxWidth,
+          child: Container(
+            padding: const EdgeInsets.all(defaultPadding),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.all(Radius.circular(10)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Listado de empresas',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
                       ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withAlpha(18),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${items.length} registradas',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
+                      decoration: BoxDecoration(
+                        color:
+                            Theme.of(context).colorScheme.primary.withAlpha(18),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: defaultPadding / 2),
-                  Wrap(
-                    spacing: defaultPadding / 2,
-                    runSpacing: defaultPadding / 2,
-                    children: ambienteCounts.entries
-                        .map(
-                          (entry) => Chip(
-                            label: Text('${entry.key}: ${entry.value}'),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  const SizedBox(height: defaultPadding),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
+                      child: Text(
+                        '${items.length} registradas',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: defaultPadding / 2),
+                Wrap(
+                  spacing: defaultPadding / 2,
+                  runSpacing: defaultPadding / 2,
+                  children: ambienteCounts.entries
+                      .map(
+                        (entry) => Chip(
+                          label: Text('${entry.key}: ${entry.value}'),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: defaultPadding),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: minTableWidth),
                     child: DataTable(
+                      horizontalMargin: 16,
+                      columnSpacing: maxWidth >= 1280 ? 46 : 30,
                       columns: const [
                         DataColumn(label: Text('RUC')),
                         DataColumn(label: Text('Razon social')),
                         DataColumn(label: Text('Ambiente')),
                         DataColumn(label: Text('Estab/PtoEmi')),
+                        DataColumn(label: Text('Sec. prod')),
+                        DataColumn(label: Text('Sec. pruebas')),
                         DataColumn(label: Text('Regimen')),
                         DataColumn(label: Text('Contabilidad')),
                         DataColumn(label: Text('Credito default')),
@@ -1007,6 +1024,13 @@ class _EmpresasList extends StatelessWidget {
                                 ),
                                 DataCell(
                                     Text('${empresa.estab}-${empresa.ptoEmi}')),
+                                DataCell(Text(empresa.secuencial)),
+                                DataCell(
+                                  Text(
+                                    empresa.secuencialPruebas ??
+                                        empresa.secuencial,
+                                  ),
+                                ),
                                 DataCell(
                                   Text(
                                       _regimenLabel(empresa.regimenTributario)),
@@ -1050,8 +1074,8 @@ class _EmpresasList extends StatelessWidget {
                           .toList(),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );

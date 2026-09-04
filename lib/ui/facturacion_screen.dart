@@ -446,6 +446,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                           );
                           _clienteEmailController.text = cliente.email;
                           _clienteDireccionController.text = cliente.direccion;
+                          _applyClientePaymentDefaults(cliente);
                         });
                       },
                       onCreateClienteRequested: (identificacion) =>
@@ -471,7 +472,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                       onEmpresaChanged: (value) {
                         setState(() => _empresaIdProceso = value);
                       },
-                      onFetch: (range, page, size) async {
+                      onFetch: (range, page, size, ambiente) async {
                         if (_empresaIdProceso == null) {
                           return;
                         }
@@ -479,6 +480,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
                           _empresaIdProceso!,
                           fechaDesde: range?.start,
                           fechaHasta: range?.end,
+                          ambiente: ambiente,
                           page: page,
                           size: size,
                         );
@@ -539,6 +541,8 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
     final direccionController = TextEditingController();
     final creditoDiasController = TextEditingController(text: '0');
     var tipoIdentificacion = cleanIdentificacion.length >= 13 ? '04' : '05';
+    var isConsultingSri = false;
+    var lastSriConsulta = '';
     int? createdId;
 
     await showDialog<void>(
@@ -548,99 +552,203 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
           title: const Text('Crear cliente'),
           content: StatefulBuilder(
             builder: (context, setLocalState) {
+              Future<void> consultarSri() async {
+                final identificacion = identificacionController.text.trim();
+                if (identificacion.isEmpty) {
+                  showAppToast(
+                    providerContext,
+                    'Ingresa la identificacion.',
+                    isError: true,
+                  );
+                  return;
+                }
+                if (tipoIdentificacion != '04') {
+                  showAppToast(
+                    providerContext,
+                    'Consulta SRI disponible solo para RUC.',
+                    isError: true,
+                  );
+                  return;
+                }
+                if (identificacion.length != 13) {
+                  showAppToast(
+                    providerContext,
+                    'El RUC debe tener 13 digitos.',
+                    isError: true,
+                  );
+                  return;
+                }
+                if (identificacion == lastSriConsulta) {
+                  return;
+                }
+                if (!context.mounted) {
+                  return;
+                }
+                setLocalState(() => isConsultingSri = true);
+                try {
+                  final provider = providerContext.read<ClientesProvider>();
+                  final result = await provider.consultarSri(identificacion);
+                  lastSriConsulta = identificacion;
+                  if (result.encontrado && result.data != null) {
+                    razonSocialController.text =
+                        result.data!.razonSocial?.trim() ?? '';
+                    final direccionSri =
+                        result.data!.direccionCompleta?.trim() ?? '';
+                    if (direccionSri.isNotEmpty &&
+                        direccionController.text.trim().isEmpty) {
+                      direccionController.text = direccionSri;
+                    }
+                    showAppToast(
+                      providerContext,
+                      'Datos cargados desde SRI.',
+                    );
+                  } else {
+                    showAppToast(
+                      providerContext,
+                      result.mensaje ??
+                          'No se encontraron datos en SRI. Llena los datos manualmente.',
+                      isError: true,
+                    );
+                  }
+                } catch (_) {
+                  showAppToast(
+                    providerContext,
+                    'No se pudo consultar SRI. Llena los datos manualmente.',
+                    isError: true,
+                  );
+                } finally {
+                  if (context.mounted) {
+                    setLocalState(() => isConsultingSri = false);
+                  }
+                }
+              }
+
               return SizedBox(
-                width: 420,
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        value: tipoIdentificacion,
-                        items: const [
-                          DropdownMenuItem(value: '05', child: Text('Cedula')),
-                          DropdownMenuItem(value: '04', child: Text('RUC')),
-                          DropdownMenuItem(
-                            value: '06',
-                            child: Text('Pasaporte'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setLocalState(() => tipoIdentificacion = value);
-                          }
-                        },
-                        decoration: const InputDecoration(labelText: 'Tipo'),
-                      ),
-                      const SizedBox(height: defaultPadding / 2),
-                      TextFormField(
-                        controller: identificacionController,
-                        decoration:
-                            const InputDecoration(labelText: 'Identificacion'),
-                        keyboardType: TextInputType.number,
-                        validator: (value) => _validateClienteIdentificacion(
-                            value, tipoIdentificacion),
-                      ),
-                      const SizedBox(height: defaultPadding / 2),
-                      TextFormField(
-                        controller: razonSocialController,
-                        decoration:
-                            const InputDecoration(labelText: 'Razon social'),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Campo requerido';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: defaultPadding / 2),
-                      TextFormField(
-                        controller: emailController,
-                        decoration: const InputDecoration(labelText: 'Email'),
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Campo requerido';
-                          }
-                          if (!value.contains('@')) {
-                            return 'Email no valido';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: defaultPadding / 2),
-                      TextFormField(
-                        controller: direccionController,
-                        decoration:
-                            const InputDecoration(labelText: 'Direccion'),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Campo requerido';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: defaultPadding / 2),
-                      TextFormField(
-                        controller: creditoDiasController,
-                        decoration: const InputDecoration(
-                          labelText: 'Credito (dias)',
+                width: 460,
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          value: tipoIdentificacion,
+                          items: const [
+                            DropdownMenuItem(
+                                value: '05', child: Text('Cedula')),
+                            DropdownMenuItem(value: '04', child: Text('RUC')),
+                            DropdownMenuItem(
+                              value: '06',
+                              child: Text('Pasaporte'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setLocalState(() => tipoIdentificacion = value);
+                            }
+                          },
+                          decoration: const InputDecoration(labelText: 'Tipo'),
                         ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          final trimmed = value?.trim() ?? '';
-                          if (trimmed.isEmpty) {
+                        const SizedBox(height: defaultPadding / 2),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: identificacionController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Identificacion',
+                                ),
+                                keyboardType: TextInputType.number,
+                                validator: (value) =>
+                                    _validateClienteIdentificacion(
+                                  value,
+                                  tipoIdentificacion,
+                                ),
+                                onChanged: (_) => lastSriConsulta = '',
+                                onFieldSubmitted: (_) => consultarSri(),
+                              ),
+                            ),
+                            const SizedBox(width: defaultPadding / 2),
+                            SizedBox(
+                              height: 48,
+                              child: FilledButton.icon(
+                                onPressed:
+                                    isConsultingSri ? null : consultarSri,
+                                icon: isConsultingSri
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.search),
+                                label: const Text('Consultar'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: defaultPadding / 2),
+                        TextFormField(
+                          controller: razonSocialController,
+                          decoration:
+                              const InputDecoration(labelText: 'Razon social'),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Campo requerido';
+                            }
                             return null;
-                          }
-                          final parsed = int.tryParse(trimmed);
-                          if (parsed == null || parsed < 0) {
-                            return 'Debe ser un numero valido';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
+                          },
+                        ),
+                        const SizedBox(height: defaultPadding / 2),
+                        TextFormField(
+                          controller: emailController,
+                          decoration: const InputDecoration(labelText: 'Email'),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Campo requerido';
+                            }
+                            if (!value.contains('@')) {
+                              return 'Email no valido';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: defaultPadding / 2),
+                        TextFormField(
+                          controller: direccionController,
+                          decoration:
+                              const InputDecoration(labelText: 'Direccion'),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Campo requerido';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: defaultPadding / 2),
+                        TextFormField(
+                          controller: creditoDiasController,
+                          decoration: const InputDecoration(
+                            labelText: 'Credito (dias)',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            final trimmed = value?.trim() ?? '';
+                            if (trimmed.isEmpty) {
+                              return null;
+                            }
+                            final parsed = int.tryParse(trimmed);
+                            if (parsed == null || parsed < 0) {
+                              return 'Debe ser un numero valido';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -1163,6 +1271,7 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         );
         _clienteEmailController.text = cliente.email;
         _clienteDireccionController.text = cliente.direccion;
+        _applyClientePaymentDefaults(cliente);
       });
 
       if (resolvedBodegaId != null) {
@@ -1213,6 +1322,17 @@ class _FacturacionScreenState extends State<FacturacionScreen> {
         ..add(_PagoDraft(formaPago: 'EFECTIVO', monto: 0));
     });
     _inventariosProvider.clearProductosDisponibles();
+  }
+
+  void _applyClientePaymentDefaults(Cliente cliente) {
+    final creditoDias = cliente.creditoDias ?? 0;
+    if (creditoDias <= 0 || _pagos.length != 1) {
+      return;
+    }
+    final pago = _pagos.first;
+    if (pago.formaPago == 'EFECTIVO' && pago.monto == 0) {
+      pago.formaPago = 'CREDITO';
+    }
   }
 
   String _normalizeEstado(String? estado) {
@@ -3657,7 +3777,12 @@ class _SeguimientoView extends StatelessWidget {
   final List<Factura> facturas;
   final int totalItems;
   final ValueChanged<int?> onEmpresaChanged;
-  final Future<void> Function(DateTimeRange? range, int page, int size) onFetch;
+  final Future<void> Function(
+    DateTimeRange? range,
+    int page,
+    int size,
+    String? ambiente,
+  ) onFetch;
   final VoidCallback onReenviar;
   final ValueChanged<int> onReenviarFactura;
   final ValueChanged<int> onVerPdf;
@@ -3711,7 +3836,12 @@ class _FacturasSeguimiento extends StatefulWidget {
   final List<Factura> facturas;
   final int totalItems;
   final ValueChanged<int?> onEmpresaChanged;
-  final Future<void> Function(DateTimeRange? range, int page, int size) onFetch;
+  final Future<void> Function(
+    DateTimeRange? range,
+    int page,
+    int size,
+    String? ambiente,
+  ) onFetch;
   final VoidCallback onReenviar;
   final ValueChanged<int> onReenviarFactura;
   final ValueChanged<int> onVerPdf;
@@ -3727,6 +3857,7 @@ class _FacturasSeguimiento extends StatefulWidget {
 class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
   static const _todasKey = 'TODAS';
   String _estadoFiltro = _todasKey;
+  bool _mostrarPruebas = false;
   DateTimeRange? _dateRange;
   int _page = 0;
   static const int _pageSize = 20;
@@ -3761,17 +3892,51 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
     final theme = Theme.of(context);
     final filteredFacturas = _filteredFacturas();
     final estados = _estadoOptions();
-    final totalCount =
-        widget.totalItems > 0 ? widget.totalItems : widget.facturas.length;
-    final pagadasCount = _countEstados({'PAGADA', 'AUTORIZADA'});
+    final produccionFacturas =
+        widget.facturas.where(_isProduccionFactura).toList();
+    final totalCount = produccionFacturas.length;
+    final facturasCobradas =
+        produccionFacturas.where(_isFacturaCobrada).toList();
+    final pagadasFacturas = produccionFacturas
+        .where(
+          (factura) =>
+              _isFacturaCobrada(factura) && _isFacturaEfectivo(factura),
+        )
+        .toList();
+    final creditoFacturas = produccionFacturas
+        .where(
+          (factura) =>
+              _isFacturaCobrada(factura) && factura.montoCredito > 0.005,
+        )
+        .toList();
+    final pagadasCount = pagadasFacturas.length;
+    final creditoCount = creditoFacturas.length;
     final pendientesCount =
-        _countEstados({'PENDIENTE', 'EN_PROCESO', 'ENVIADA'});
-    final canceladasCount = _countEstados({'CANCELADA', 'ANULADA'});
+        _countEstadosProduccion({'PENDIENTE', 'EN_PROCESO', 'ENVIADA'});
+    final canceladasCount = _countEstadosProduccion({'CANCELADA', 'ANULADA'});
+    final dineroCobrado = facturasCobradas.fold<double>(
+      0,
+      (sum, factura) => sum + factura.montoCobrado,
+    );
+    final porCobrar = creditoFacturas.fold<double>(
+        0, (sum, factura) => sum + factura.montoCredito);
+    final ivaCobrado = facturasCobradas.fold<double>(
+      0,
+      (sum, factura) => sum + factura.ivaProporcional(factura.montoCobrado),
+    );
+    final ivaPorCobrar = facturasCobradas.fold<double>(
+      0,
+      (sum, factura) => sum + factura.ivaProporcional(factura.montoCredito),
+    );
     final isDark = theme.brightness == Brightness.dark;
     final totalTint = const Color(0xFF2F5BEA);
     final pagadasTint = const Color(0xFFF57C00);
     final pendientesTint = const Color(0xFF2E7D32);
     final canceladasTint = const Color(0xFFD32F2F);
+    final creditoTint = const Color(0xFF7B61FF);
+    final cobradoTint = const Color(0xFF00897B);
+    final porCobrarTint = const Color(0xFFC2185B);
+    final ivaTint = const Color(0xFF546E7A);
     Color statBg(Color tint) {
       if (!isDark) {
         return tint.withOpacity(0.12);
@@ -3809,16 +3974,22 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                     runSpacing: defaultPadding / 2,
                     children: [
                       _StatCard(
-                        title: 'Total facturas',
+                        title: 'Total produccion',
                         value: totalCount.toString(),
                         color: statBg(totalTint),
                         valueColor: totalTint,
                       ),
                       _StatCard(
-                        title: 'Pagadas',
+                        title: 'Pagadas efectivo',
                         value: pagadasCount.toString(),
                         color: statBg(pagadasTint),
                         valueColor: pagadasTint,
+                      ),
+                      _StatCard(
+                        title: 'Facturas a credito',
+                        value: creditoCount.toString(),
+                        color: statBg(creditoTint),
+                        valueColor: creditoTint,
                       ),
                       _StatCard(
                         title: 'Pendientes',
@@ -3831,6 +4002,30 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                         value: canceladasCount.toString(),
                         color: statBg(canceladasTint),
                         valueColor: canceladasTint,
+                      ),
+                      _StatCard(
+                        title: 'Dinero cobrado',
+                        value: _formatMontoValor(dineroCobrado),
+                        color: statBg(cobradoTint),
+                        valueColor: cobradoTint,
+                      ),
+                      _StatCard(
+                        title: 'Por cobrar',
+                        value: _formatMontoValor(porCobrar),
+                        color: statBg(porCobrarTint),
+                        valueColor: porCobrarTint,
+                      ),
+                      _StatCard(
+                        title: 'IVA cobrado',
+                        value: _formatMontoValor(ivaCobrado),
+                        color: statBg(ivaTint),
+                        valueColor: ivaTint,
+                      ),
+                      _StatCard(
+                        title: 'IVA por cobrar',
+                        value: _formatMontoValor(ivaPorCobrar),
+                        color: statBg(creditoTint),
+                        valueColor: creditoTint,
                       ),
                     ],
                   ),
@@ -3861,25 +4056,7 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                         )
                       : TextFormField(
                           readOnly: true,
-                          initialValue: _empresaLabel(
-                            widget.empresas.firstWhere(
-                              (empresa) => empresa.id == widget.empresaId,
-                              orElse: () => widget.empresas.isNotEmpty
-                                  ? widget.empresas.first
-                                  : Empresa(
-                                      id: 0,
-                                      ambiente: '',
-                                      tipoEmision: '',
-                                      razonSocial: '-',
-                                      nombreComercial: '',
-                                      ruc: '',
-                                      dirMatriz: '',
-                                      estab: '',
-                                      ptoEmi: '',
-                                      secuencial: '',
-                                    ),
-                            ),
-                          ),
+                          initialValue: _selectedEmpresaLabel(),
                           decoration:
                               const InputDecoration(labelText: 'Empresa'),
                         ),
@@ -3903,6 +4080,27 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                         onPressed: widget.onConsultarEstado,
                         icon: const Icon(Icons.pending_actions),
                         label: const Text('Estado factura'),
+                      ),
+                      FilterChip(
+                        selected: _mostrarPruebas,
+                        avatar: Icon(
+                          _mostrarPruebas
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 18,
+                        ),
+                        label: Text(
+                          _mostrarPruebas
+                              ? 'Ocultar pruebas'
+                              : 'Facturas de prueba',
+                        ),
+                        onSelected: (selected) {
+                          setState(() {
+                            _mostrarPruebas = selected;
+                            _page = 0;
+                          });
+                          _request();
+                        },
                       ),
                       DropdownButton<String>(
                         value: _estadoFiltro,
@@ -3948,26 +4146,31 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                       : LayoutBuilder(
                           builder: (context, constraints) {
                             final maxWidth = constraints.maxWidth;
-                            final cardWidth = Responsive.isDesktop(context)
-                                ? (maxWidth > 1120 ? 1120.0 : maxWidth)
-                                : maxWidth;
                             final useMenuActions =
-                                !Responsive.isDesktop(context);
+                                !Responsive.isDesktop(context) ||
+                                    maxWidth < 1080;
                             final actionsWidth = useMenuActions ? 56.0 : 176.0;
                             final messageWidth =
-                                Responsive.isDesktop(context) ? 280.0 : 220.0;
-                            return Align(
-                              alignment: Alignment.topCenter,
-                              child: SizedBox(
-                                width: cardWidth,
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
+                                maxWidth >= 1280 ? maxWidth * 0.24 : 220.0;
+                            final minTableWidth =
+                                maxWidth < 920 ? 920.0 : maxWidth;
+                            return SizedBox(
+                              width: maxWidth,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minWidth: minTableWidth,
+                                  ),
                                   child: DataTable(
+                                    horizontalMargin: 16,
+                                    columnSpacing: maxWidth >= 1280 ? 48 : 28,
                                     columns: [
                                       const DataColumn(label: Text('Factura')),
                                       const DataColumn(label: Text('Cliente')),
                                       const DataColumn(label: Text('Fecha')),
                                       const DataColumn(label: Text('Monto')),
+                                      const DataColumn(label: Text('Ambiente')),
                                       const DataColumn(label: Text('Estado')),
                                       DataColumn(
                                         label: SizedBox(
@@ -4007,6 +4210,17 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
                                           ),
                                           DataCell(
                                             Text(_formatMonto(factura.total)),
+                                          ),
+                                          DataCell(
+                                            _FacturaAmbienteChip(
+                                              label: _ambienteLabel(
+                                                _normalizeAmbiente(
+                                                  factura.ambiente,
+                                                ),
+                                              ),
+                                              isProduccion:
+                                                  _isProduccionFactura(factura),
+                                            ),
                                           ),
                                           DataCell(
                                             Chip(
@@ -4193,6 +4407,9 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
 
   List<Factura> _filteredFacturas() {
     Iterable<Factura> data = widget.facturas;
+    if (!_mostrarPruebas) {
+      data = data.where(_isProduccionFactura);
+    }
     if (_estadoFiltro != _todasKey) {
       data = data.where(
         (factura) => _normalizeEstado(factura.estado) == _estadoFiltro,
@@ -4220,7 +4437,9 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
         return !fecha.isBefore(start) && !fecha.isAfter(end);
       });
     }
-    return data.toList();
+    final result = data.toList();
+    result.sort(_compareFacturasByNumeroDesc);
+    return result;
   }
 
   List<String> _estadoOptions() {
@@ -4266,16 +4485,82 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
     }
   }
 
+  String _normalizeAmbiente(String? ambiente) {
+    final value = ambiente?.trim().toUpperCase();
+    if (value == null || value.isEmpty) {
+      return 'SIN_AMBIENTE';
+    }
+    if (value == '2' || value == 'PRODUCCION') {
+      return 'PRODUCCION';
+    }
+    if (value == '1' || value == 'PRUEBAS') {
+      return 'PRUEBAS';
+    }
+    return value;
+  }
+
+  String _ambienteLabel(String ambiente) {
+    switch (ambiente) {
+      case 'PRODUCCION':
+        return 'Produccion';
+      case 'PRUEBAS':
+        return 'Pruebas';
+      case 'SIN_AMBIENTE':
+        return 'Sin ambiente';
+      default:
+        final label = ambiente.replaceAll('_', ' ').toLowerCase();
+        return label.isEmpty
+            ? ambiente
+            : '${label[0].toUpperCase()}${label.substring(1)}';
+    }
+  }
+
+  bool _isProduccionFactura(Factura factura) {
+    return _normalizeAmbiente(factura.ambiente) == 'PRODUCCION';
+  }
+
+  bool _isFacturaCobrada(Factura factura) {
+    return {'PAGADA', 'AUTORIZADA'}.contains(_normalizeEstado(factura.estado));
+  }
+
+  bool _isFacturaEfectivo(Factura factura) {
+    if (factura.pagos.isEmpty) {
+      return !factura.esCredito;
+    }
+    return factura.pagos.every((pago) => pago.esEfectivo);
+  }
+
   bool _isEnProceso(String? estado) {
     final normalized = _normalizeEstado(estado);
     return normalized.contains('PROCESO');
   }
 
-  int _countEstados(Set<String> estados) {
+  int _countEstadosProduccion(Set<String> estados) {
     return widget.facturas.where((factura) {
       final normalized = _normalizeEstado(factura.estado);
-      return estados.contains(normalized);
+      return _isProduccionFactura(factura) && estados.contains(normalized);
     }).length;
+  }
+
+  int _compareFacturasByNumeroDesc(Factura a, Factura b) {
+    final seqA = _facturaSecuencial(a);
+    final seqB = _facturaSecuencial(b);
+    if (seqA != seqB) {
+      return seqB.compareTo(seqA);
+    }
+    final fechaA = a.fechaEmision;
+    final fechaB = b.fechaEmision;
+    if (fechaA != null && fechaB != null && fechaA != fechaB) {
+      return fechaB.compareTo(fechaA);
+    }
+    return (b.id ?? 0).compareTo(a.id ?? 0);
+  }
+
+  int _facturaSecuencial(Factura factura) {
+    final numero = _facturaNumero(factura);
+    final parts = numero.split('-');
+    final value = parts.isEmpty ? numero : parts.last;
+    return int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
   }
 
   String _facturaNumero(Factura factura) {
@@ -4300,6 +4585,10 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
     if (total == null) {
       return '-';
     }
+    return _formatMontoValor(total);
+  }
+
+  String _formatMontoValor(double total) {
     return '\$${total.toStringAsFixed(2)}';
   }
 
@@ -4349,7 +4638,11 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
       return;
     }
     final range = _dateRange ?? _defaultRange();
-    await widget.onFetch(range, _page, _pageSize);
+    await widget.onFetch(range, _page, _pageSize, _ambienteConsulta());
+  }
+
+  String? _ambienteConsulta() {
+    return _mostrarPruebas ? null : 'PRODUCCION';
   }
 
   String _empresaLabel(Empresa empresa) {
@@ -4365,6 +4658,19 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
       return ruc;
     }
     return '$ruc - $nombre';
+  }
+
+  String _selectedEmpresaLabel() {
+    final selected = widget.empresas.where(
+      (empresa) => empresa.id != null && empresa.id == widget.empresaId,
+    );
+    if (selected.isNotEmpty) {
+      return _empresaLabel(selected.first);
+    }
+    if (widget.empresas.isNotEmpty) {
+      return _empresaLabel(widget.empresas.first);
+    }
+    return widget.empresaId == null ? '-' : 'Empresa ${widget.empresaId}';
   }
 
   DateTimeRange _defaultRange() {
@@ -4505,6 +4811,26 @@ class _FacturasSeguimientoState extends State<_FacturasSeguimiento> {
       default:
         return Colors.orange;
     }
+  }
+}
+
+class _FacturaAmbienteChip extends StatelessWidget {
+  const _FacturaAmbienteChip({
+    required this.label,
+    required this.isProduccion,
+  });
+
+  final String label;
+  final bool isProduccion;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isProduccion ? Colors.green : Colors.orange;
+    return Chip(
+      label: Text(label),
+      backgroundColor: color.withAlpha(34),
+      labelStyle: TextStyle(color: color.shade700),
+    );
   }
 }
 

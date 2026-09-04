@@ -1,4 +1,5 @@
 import '../domain/models/cliente.dart';
+import '../domain/models/sri_consulta.dart';
 import '../utils/json_utils.dart';
 import 'api_client.dart';
 
@@ -46,6 +47,22 @@ class ClientesService {
       return cliente;
     }
     return Cliente.fromJson(map);
+  }
+
+  Future<SriConsultaResult> consultarSri(String identificacion) async {
+    final response = await _client.get(
+      '/api/clientes/consulta-sri',
+      query: {'identificacion': identificacion},
+    );
+    if (response is Map) {
+      return SriConsultaResult.fromJson(
+        Map<String, dynamic>.from(response),
+      );
+    }
+    if (response is String && response.isNotEmpty) {
+      return SriConsultaResult(encontrado: false, mensaje: response);
+    }
+    return SriConsultaResult(encontrado: false);
   }
 
   String _tipoIdentificacionApi(String value) {

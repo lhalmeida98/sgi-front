@@ -34,6 +34,7 @@ class SriConsultaData {
     this.regimen,
     this.categoria,
     this.obligadoLlevarContabilidad,
+    this.direccionCompleta,
     this.agenteRetencion,
     this.contribuyenteEspecial,
     this.contribuyenteFantasma,
@@ -48,6 +49,7 @@ class SriConsultaData {
   final String? regimen;
   final String? categoria;
   final String? obligadoLlevarContabilidad;
+  final String? direccionCompleta;
   final String? agenteRetencion;
   final String? contribuyenteEspecial;
   final String? contribuyenteFantasma;
@@ -65,6 +67,8 @@ class SriConsultaData {
       categoria: json['categoria']?.toString(),
       obligadoLlevarContabilidad:
           json['obligadoLlevarContabilidad']?.toString(),
+      direccionCompleta:
+          (json['direccionCompleta'] ?? json['direccion'])?.toString(),
       agenteRetencion: json['agenteRetencion']?.toString(),
       contribuyenteEspecial: json['contribuyenteEspecial']?.toString(),
       contribuyenteFantasma: json['contribuyenteFantasma']?.toString(),

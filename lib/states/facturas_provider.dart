@@ -30,6 +30,7 @@ class FacturasProvider extends BaseProvider {
     int empresaId, {
     DateTime? fechaDesde,
     DateTime? fechaHasta,
+    String? ambiente,
     int page = 0,
     int size = 20,
   }) async {
@@ -41,6 +42,7 @@ class FacturasProvider extends BaseProvider {
         empresaId,
         fechaDesde: start,
         fechaHasta: end,
+        ambiente: ambiente,
         page: page,
         size: size,
       );

@@ -1,4 +1,5 @@
 import '../domain/models/cliente.dart';
+import '../domain/models/sri_consulta.dart';
 import '../services/clientes_service.dart';
 import 'base_provider.dart';
 
@@ -45,6 +46,17 @@ class ClientesProvider extends BaseProvider {
       return false;
     } finally {
       setLoading(false);
+    }
+  }
+
+  Future<SriConsultaResult> consultarSri(String identificacion) async {
+    try {
+      final result = await _service.consultarSri(identificacion);
+      setError(null);
+      return result;
+    } catch (error) {
+      setError(resolveError(error));
+      rethrow;
     }
   }
 }

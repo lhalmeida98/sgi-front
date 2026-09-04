@@ -46,6 +46,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final auth = context.read<AuthProvider>();
     final userId = auth.usuarioId;
     if (userId == null && !auth.isAdmin) {
+      final empresaId = auth.empresaId;
+      if (empresaId != null) {
+        setState(() => _selectedEmpresaId = empresaId);
+        _loadResumen(empresaId: empresaId);
+      }
       return;
     }
     if (!mounted) {
@@ -79,6 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
       _empresas = [];
+      _selectedEmpresaId = auth.empresaId;
     } finally {
       if (mounted) {
         setState(() => _loadingEmpresas = false);

@@ -43,6 +43,7 @@ class FacturasService {
     int empresaId, {
     DateTime? fechaDesde,
     DateTime? fechaHasta,
+    String? ambiente,
     int page = 0,
     int size = 20,
   }) async {
@@ -55,6 +56,9 @@ class FacturasService {
     }
     if (fechaHasta != null) {
       query['fechaHasta'] = _formatDate(fechaHasta);
+    }
+    if (ambiente != null && ambiente.trim().isNotEmpty) {
+      query['ambiente'] = ambiente.trim();
     }
     final response = await _client.get(
       '/api/facturas/empresa/$empresaId',
